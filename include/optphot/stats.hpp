@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 //
 // stats.hpp - small host-only statistics helpers used by the tests and the
-// CPU/GPU comparison harness (chi-square goodness of fit and its p-value).
+// CPU/GPU comparison harness: chi-square and Kolmogorov-Smirnov tests.
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -68,6 +69,81 @@ inline Chi2Result chi2_gof(const std::vector<double>& observed, const std::vecto
   }
   r.ndf = nbins - fitted_params;
   r.pvalue = chi2_pvalue(r.chi2, r.ndf);
+  return r;
+}
+
+// Two-sample chi-square test for histograms a and b (possibly different
+// totals), NR 3rd ed. section 14.3: chi2 = sum (sqrt(B/A) a - sqrt(A/B) b)^2 / (a + b).
+// Bins empty in both histograms are skipped. ndf = (non-empty bins) - 1.
+inline Chi2Result chi2_two_sample(const std::vector<double>& a, const std::vector<double>& b) {
+  double A = 0.0, B = 0.0;
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    A += a[i];
+    B += b[i];
+  }
+  const double ra = std::sqrt(B / A), rb = std::sqrt(A / B);
+  Chi2Result r;
+  int nbins = 0;
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    if (a[i] + b[i] <= 0.0) continue;
+    const double d = ra * a[i] - rb * b[i];
+    r.chi2 += d * d / (a[i] + b[i]);
+    ++nbins;
+  }
+  r.ndf = nbins - 1;
+  r.pvalue = chi2_pvalue(r.chi2, r.ndf);
+  return r;
+}
+
+// Kolmogorov distribution Q_KS(lambda) = 2 sum_j (-1)^(j-1) exp(-2 j^2 lambda^2).
+inline double kolmogorov_q(double lambda) {
+  if (lambda < 0.2) return 1.0;
+  double sum = 0.0, sign = 1.0;
+  for (int j = 1; j <= 100; ++j) {
+    const double term = sign * std::exp(-2.0 * j * j * lambda * lambda);
+    sum += term;
+    if (std::fabs(term) < 1e-16) break;
+    sign = -sign;
+  }
+  return std::clamp(2.0 * sum, 0.0, 1.0);
+}
+
+struct KsResult {
+  double d = 0.0;  // max |F1 - F2|
+  double pvalue = 1.0;
+};
+
+// One-sample KS test of `x` against the CDF `cdf` (sorts a copy of x).
+template <class Cdf>
+KsResult ks_one_sample(std::vector<double> x, Cdf cdf) {
+  std::sort(x.begin(), x.end());
+  const double n = static_cast<double>(x.size());
+  KsResult r;
+  for (std::size_t i = 0; i < x.size(); ++i) {
+    const double f = cdf(x[i]);
+    r.d = std::max({r.d, std::fabs((i + 1) / n - f), std::fabs(f - i / n)});
+  }
+  const double sn = std::sqrt(n);
+  r.pvalue = kolmogorov_q((sn + 0.12 + 0.11 / sn) * r.d);
+  return r;
+}
+
+// Two-sample KS test (sorts copies of the inputs). Assumes continuous data;
+// ties between the samples are handled by advancing both.
+inline KsResult ks_two_sample(std::vector<double> a, std::vector<double> b) {
+  std::sort(a.begin(), a.end());
+  std::sort(b.begin(), b.end());
+  const double na = static_cast<double>(a.size()), nb = static_cast<double>(b.size());
+  std::size_t i = 0, j = 0;
+  KsResult r;
+  while (i < a.size() && j < b.size()) {
+    const double v = std::min(a[i], b[j]);
+    while (i < a.size() && a[i] == v) ++i;
+    while (j < b.size() && b[j] == v) ++j;
+    r.d = std::max(r.d, std::fabs(i / na - j / nb));
+  }
+  const double ne = std::sqrt(na * nb / (na + nb));
+  r.pvalue = kolmogorov_q((ne + 0.12 + 0.11 / ne) * r.d);
   return r;
 }
 

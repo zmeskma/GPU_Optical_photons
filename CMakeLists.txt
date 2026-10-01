@@ -58,6 +58,9 @@ add_library(optphot_physics INTERFACE)
 target_include_directories(optphot_physics INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(optphot_physics INTERFACE cxx_std_17)
 
+add_subdirectory(src)
+add_subdirectory(apps)
+
 if(OPTPHOT_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)

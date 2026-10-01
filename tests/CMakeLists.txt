@@ -16,3 +16,12 @@ add_executable(unit_tests
   test_geometry.cpp)
 target_link_libraries(unit_tests PRIVATE optphot_physics optphot_warnings Catch2::Catch2WithMain)
 catch_discover_tests(unit_tests TEST_PREFIX "unit:")
+
+add_executable(config_tests test_config.cpp)
+target_link_libraries(config_tests PRIVATE optphot optphot_warnings Catch2::Catch2WithMain)
+catch_discover_tests(config_tests TEST_PREFIX "config:")
+
+# End-to-end transport validated against analytic results (CPU backend).
+add_executable(validation_tests test_transport_cpu.cpp)
+target_link_libraries(validation_tests PRIVATE optphot optphot_warnings Catch2::Catch2WithMain)
+catch_discover_tests(validation_tests TEST_PREFIX "validation:")

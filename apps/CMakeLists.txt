@@ -1,0 +1,3 @@
+add_executable(optphot_cli optphot_main.cpp)
+set_target_properties(optphot_cli PROPERTIES OUTPUT_NAME optphot)
+target_link_libraries(optphot_cli PRIVATE optphot optphot_warnings)
