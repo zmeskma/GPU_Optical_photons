@@ -1,0 +1,29 @@
+# Build trees
+build*/
+cmake-build-*/
+out/
+
+# Simulation output (regenerate with the apps; figures in docs/figures are tracked)
+results/
+runs/
+*.npy
+*.npz
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+
+# Profiler reports
+*.nsys-rep
+*.ncu-rep
+*.sqlite
+
+# Editors / OS
+.vscode/
+.idea/
+.vs/
+*.swp
+.DS_Store
+Thumbs.db
