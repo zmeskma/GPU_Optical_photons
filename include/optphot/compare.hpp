@@ -49,10 +49,12 @@ struct DistributionComparison {
 };
 
 // Histograms detected photons' arrival times on [0, t_max) with time_bins bins
+// (t_max <= 0: the latest detected arrival time in either sample, so that
+// prompt-emission setups with sub-ns times are binned sensibly)
 // and hit positions on the readout face with xy_bins x xy_bins bins.
 DistributionComparison compare_distributions(const PhotonRecords& a, const PhotonRecords& b,
                                              const SimParams& p, int time_bins = 100,
-                                             float t_max = 50.0f, int xy_bins = 20);
+                                             float t_max = 0.0f, int xy_bins = 20);
 
 std::string to_json(const HistoryAgreement& h);
 std::string to_json(const DistributionComparison& d);

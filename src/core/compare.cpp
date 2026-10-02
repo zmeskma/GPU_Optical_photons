@@ -67,6 +67,14 @@ HistoryAgreement compare_histories(const PhotonRecords& a, const PhotonRecords& 
 DistributionComparison compare_distributions(const PhotonRecords& a, const PhotonRecords& b,
                                              const SimParams& p, int time_bins, float t_max,
                                              int xy_bins) {
+  if (t_max <= 0.0f) {
+    for (const PhotonRecords* r : {&a, &b}) {
+      for (std::size_t i = 0; i < r->size(); ++i) {
+        if (static_cast<Fate>(r->fate[i]) == Fate::Detected) t_max = std::max(t_max, r->t[i]);
+      }
+    }
+    t_max = std::nextafter(t_max, kInfinity);  // the latest arrival falls inside the range
+  }
   const Histos ha = histogram(a, p, time_bins, t_max, xy_bins);
   const Histos hb = histogram(b, p, time_bins, t_max, xy_bins);
   DistributionComparison d;

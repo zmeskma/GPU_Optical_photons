@@ -83,7 +83,7 @@ def main():
     sub = []
     if args.label:
         sub.append(args.label)
-    if devices:
+    if devices and not any("GTX" in x or "RTX" in x or "Tesla" in x for x in sub):
         sub.append("GPU: " + ", ".join(devices))
     if threads:
         sub.append(f"CPU: {threads[-1]} threads")
@@ -94,28 +94,38 @@ def main():
     # 2. GPU records-mode time breakdown: where does the time go?
     gpu_rec = [r for r in rows if r["backend"] == "gpu" and r["mode"] == "records"]
     if gpu_rec:
-        parts = [("kernel_ms", "transport kernel", style.ORANGE),
-                 ("d2h_ms", "device → host copy", style.BLUE),
-                 ("alloc_ms", "allocation", style.AQUA)]
         ns = sorted({int(r["n_photons"]) for r in gpu_rec})
-        fig, ax = plt.subplots(figsize=(7.2, 4.4), layout="constrained")
+
+        def gpu_median(field):
+            m = median_by(gpu_rec, ("n_photons",), field)
+            return np.array([m[(str(n),)][0] for n in ns])
+
+        total = gpu_median("total_ms")
+        kernel, d2h, alloc = gpu_median("kernel_ms"), gpu_median("d2h_ms"), gpu_median("alloc_ms")
+        # Whatever is not kernel, copy or device allocation happens on the host:
+        # mostly resizing (zero-filling, first-touch page faults) the output vectors.
+        host = np.clip(total - kernel - d2h - alloc, 0, None)
+        parts = [(kernel, "transport kernel", style.ORANGE),
+                 (d2h, "device → host copy", style.BLUE),
+                 (alloc, "device allocation", style.AQUA),
+                 (host, "host buffers (vector resize / zero-fill)", style.YELLOW)]
+        fig, ax = plt.subplots(figsize=(7.6, 4.6), layout="constrained")
         x = np.arange(len(ns))
         bottom = np.zeros(len(ns))
-        for field, label, color in parts:
-            m = median_by(gpu_rec, ("n_photons",), field)
-            vals = np.array([m[(str(n),)][0] for n in ns])
-            totals = np.array([median_by(gpu_rec, ("n_photons",), "total_ms")[(str(n),)][0]
-                               for n in ns])
-            frac = vals / totals
+        for vals, label, color in parts:
+            frac = vals / total
             ax.bar(x, frac, bottom=bottom, color=color, width=0.6, label=label,
                    edgecolor=style.SURFACE, linewidth=2)
             bottom += frac
+        for xi, t in zip(x, total):
+            ax.annotate(f"{t:.1f} ms", (xi, 1.0), xytext=(0, 3), textcoords="offset points",
+                        ha="center", fontsize=8, color=style.INK_SECONDARY)
         ax.set_xticks(x, [f"{n:.0e}" for n in ns])
         ax.set_xlabel("photons per run")
         ax.set_ylabel("fraction of wall time")
-        ax.set_ylim(0, 1.05)
-        ax.set_title("GPU records mode: time breakdown (rest = host-side resize/overhead)")
-        ax.legend(loc="upper left", ncols=3)
+        ax.set_ylim(0, 1.12)
+        ax.set_title("GPU records mode: where the wall time goes (median total above bars)")
+        ax.legend(loc="upper center", ncols=2, bbox_to_anchor=(0.5, -0.16))
         style.save(fig, os.path.join(args.outdir, f"{args.prefix}_gpu_breakdown.png"))
 
     # Markdown table for the README.

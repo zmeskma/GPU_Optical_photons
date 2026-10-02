@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 #if defined(__CUDACC__)
 #define OPT_HD __host__ __device__
@@ -34,7 +35,9 @@ namespace optphot {
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kTwoPi = 6.28318530717958647692f;
 constexpr float kSpeedOfLight = 299.792458f;  // mm / ns
-constexpr float kInfinity = INFINITY;
+// numeric_limits rather than the INFINITY macro: MSVC defines INFINITY as an
+// overflowing cast, which nvcc rejects in a constant expression.
+constexpr float kInfinity = std::numeric_limits<float>::infinity();
 
 // Portable test for +inf (used as "process disabled"); avoids the
 // host/device differences of isinf / std::isinf overloads.

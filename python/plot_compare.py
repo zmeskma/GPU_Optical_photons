@@ -44,14 +44,16 @@ def plot_setup(label, d, outdir):
 
     fig, axs = plt.subplots(2, 2, figsize=(12, 6.2), sharex="col", layout="constrained",
                             gridspec_kw=dict(height_ratios=[3, 1.2]))
-    tb = np.linspace(0, 40, 81)
+    # Data-driven time range (prompt-emission setups only span ~0.1-0.3 ns).
+    t_hi = float(np.quantile(np.concatenate([cpu["t"][dc], gpu["t"][dg]]), 0.9999))
+    tb = np.linspace(0, t_hi, 81)
     tc = 0.5 * (tb[1:] + tb[:-1])
     h1, _ = np.histogram(cpu["t"][dc], tb)
     h2, _ = np.histogram(gpu["t"][dg], tb)
     axs[0, 0].stairs(h1, tb, color=style.BLUE, lw=2, label=f"CPU (seed {meta['seed']})")
     axs[0, 0].stairs(h2, tb, color=style.ORANGE, lw=2, ls="--",
                      label=f"GPU (seed {gpu['meta']['seed']})")
-    axs[0, 0].set_yscale("log")
+    axs[0, 0].set_yscale("log" if t_hi > 2 else "linear")
     axs[0, 0].set_ylabel("detected photons / bin")
     axs[0, 0].set_title(f"Arrival time: χ² p = {stat['time_chi2_p']:.2f}, "
                         f"KS p = {stat['time_ks_p']:.2f}")

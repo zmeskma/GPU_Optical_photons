@@ -112,13 +112,6 @@ int main(int argc, char** argv) {
     csv << "backend,mode,n_photons,repeat,threads,total_ms,kernel_ms,alloc_ms,h2d_ms,d2h_ms,"
            "photons_per_s_kernel,photons_per_s_total,device\n";
 
-#if defined(OPTPHOT_HAVE_CUDA)
-    if (have_gpu) {  // warm-up: context creation, module loading, clocks
-      Tally warm;
-      run_gpu_tally(p, o.tally, 100000, warm, o.block_size);
-    }
-#endif
-
     for (const std::string& backend : b.backends) {
       if (backend == "gpu" && !have_gpu) {
         std::printf("skipping gpu backend (not available)\n");
@@ -128,6 +121,16 @@ int main(int argc, char** argv) {
         std::printf("skipping cpu_omp backend (no OpenMP)\n");
         continue;
       }
+#if defined(OPTPHOT_HAVE_CUDA)
+      if (backend == "gpu") {
+        // Warm-up immediately before the GPU measurements: creates the context
+        // and, importantly on laptops, lets the GPU leave its idle clock state
+        // (it drops back while the CPU benchmarks run). ~0.5 s of real work.
+        Tally warm;
+        double busy_ms = 0.0;
+        while (busy_ms < 500.0) busy_ms += run_gpu_tally(p, o.tally, 10000000, warm, o.block_size).total_ms;
+      }
+#endif
       const int threads = backend == "cpu1" ? 1 : 0;
       for (const std::string& mode : b.modes) {
         for (const uint64_t n : b.sizes) {

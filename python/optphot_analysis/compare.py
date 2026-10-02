@@ -40,12 +40,14 @@ def two_sample_chi2(h1, h2):
     return float(chi2), ndf, float(stats.chi2.sf(chi2, ndf))
 
 
-def distribution_tests(a, b, half_x=25.0, half_y=25.0, t_max=50.0, time_bins=100, xy_bins=20):
+def distribution_tests(a, b, half_x=25.0, half_y=25.0, t_max=None, time_bins=100, xy_bins=20):
     """Statistical comparison (meaningful for INDEPENDENT seeds)."""
     da, db = a["fate"] == 0, b["fate"] == 0
     na, nb = len(a["fate"]), len(b["fate"])
     ea, eb = da.mean(), db.mean()
     sa, sb = np.sqrt(ea * (1 - ea) / na), np.sqrt(eb * (1 - eb) / nb)
+    if t_max is None:  # latest detected arrival in either sample (prompt setups: sub-ns)
+        t_max = float(max(a["t"][da].max(), b["t"][db].max())) * (1 + 1e-6)
     tb = np.append(np.linspace(0, t_max, time_bins + 1), np.inf)
     ht1, _ = np.histogram(a["t"][da], tb)
     ht2, _ = np.histogram(b["t"][db], tb)
