@@ -20,7 +20,9 @@ constexpr double kPi = 3.14159265358979323846;
 // F(x, y) is the solid angle of the rectangle [0,x] x [0,y] (signed), so the
 // formula is the inclusion-exclusion over the four corner rectangles.
 inline double rect_solid_angle(double x1, double x2, double y1, double y2, double h) {
-  auto F = [h](double x, double y) { return std::atan(x * y / (h * std::sqrt(x * x + y * y + h * h))); };
+  auto F = [h](double x, double y) {
+    return std::atan(x * y / (h * std::sqrt(x * x + y * y + h * h)));
+  };
   return F(x2, y2) - F(x1, y2) - F(x2, y1) + F(x1, y1);
 }
 
@@ -88,8 +90,8 @@ inline double face_survival_fraction(const SimParams& p, int face, double L, int
   auto edges = [panels](double a, double b) {
     std::vector<double> e;
     // Split at 0 (foot point) if inside, then uniform panels on each side.
-    const std::vector<double> cuts = (a < 0.0 && b > 0.0) ? std::vector<double>{a, 0.0, b}
-                                                          : std::vector<double>{a, b};
+    const std::vector<double> cuts =
+        (a < 0.0 && b > 0.0) ? std::vector<double>{a, 0.0, b} : std::vector<double>{a, b};
     for (std::size_t k = 0; k + 1 < cuts.size(); ++k) {
       for (int i = 0; i < panels; ++i) e.push_back(cuts[k] + (cuts[k + 1] - cuts[k]) * i / panels);
     }

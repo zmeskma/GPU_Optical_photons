@@ -85,9 +85,8 @@ bool gpu_available();
 std::string gpu_device_name();
 // block_size: CUDA threads per block. Records are produced in chunks of at
 // most `chunk` photons to bound device memory.
-RunTiming run_gpu_records(const SimParams& p, uint64_t n, PhotonRecords& out,
-                          int block_size = 256, uint64_t first_id = 0,
-                          uint64_t chunk = 1ull << 24);
+RunTiming run_gpu_records(const SimParams& p, uint64_t n, PhotonRecords& out, int block_size = 256,
+                          uint64_t first_id = 0, uint64_t chunk = 1ull << 24);
 RunTiming run_gpu_tally(const SimParams& p, const TallyConfig& c, uint64_t n, Tally& out,
                         int block_size = 256, uint64_t first_id = 0);
 

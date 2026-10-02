@@ -70,8 +70,9 @@ OPT_HD OPT_INLINE float log(float x) {
   const float s = (m - 1.0f) / (m + 1.0f);
   const float s2 = s * s;
   const float poly =
-      1.0f + s2 * (1.0f / 3.0f +
-                   s2 * (1.0f / 5.0f + s2 * (1.0f / 7.0f + s2 * (1.0f / 9.0f + s2 * (1.0f / 11.0f)))));
+      1.0f +
+      s2 * (1.0f / 3.0f +
+            s2 * (1.0f / 5.0f + s2 * (1.0f / 7.0f + s2 * (1.0f / 9.0f + s2 * (1.0f / 11.0f)))));
   // ln 2 split as in fdlibm's logf: the high part has trailing zero bits so
   // that e * ln2_hi is exact; ln2_lo is the correction.
   const float ln2_hi = 6.9313812256e-01f;  // 0x3f317180
@@ -94,10 +95,12 @@ OPT_HD OPT_INLINE void sincos_turns(float u, float& s, float& c) {
   const float x = r * 1.57079632679489662f;
   const float x2 = x * x;
   const float sp =
-      x * (1.0f + x2 * (-1.0f / 6.0f + x2 * (1.0f / 120.0f + x2 * (-1.0f / 5040.0f + x2 * (1.0f / 362880.0f)))));
+      x * (1.0f + x2 * (-1.0f / 6.0f +
+                        x2 * (1.0f / 120.0f + x2 * (-1.0f / 5040.0f + x2 * (1.0f / 362880.0f)))));
   const float cp =
-      1.0f + x2 * (-0.5f + x2 * (1.0f / 24.0f +
-                                x2 * (-1.0f / 720.0f + x2 * (1.0f / 40320.0f + x2 * (-1.0f / 3628800.0f)))));
+      1.0f +
+      x2 * (-0.5f + x2 * (1.0f / 24.0f + x2 * (-1.0f / 720.0f + x2 * (1.0f / 40320.0f +
+                                                                      x2 * (-1.0f / 3628800.0f)))));
   // Rotate by q quarter turns.
   const int quadrant = static_cast<int>(q) & 3;
   if (quadrant == 0) {

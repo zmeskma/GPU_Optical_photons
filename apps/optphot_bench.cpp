@@ -161,10 +161,11 @@ int main(int argc, char** argv) {
                 << t.total_ms << "," << t.kernel_ms << "," << t.alloc_ms << "," << t.h2d_ms << ","
                 << t.d2h_ms << "," << pps_k << "," << pps_t << ",\""
                 << (backend == "gpu" ? device : "cpu") << "\"\n";
-            std::printf("%-8s %-8s n=%-10llu rep %d: kernel %10.2f ms  total %10.2f ms  "
-                        "(D2H %8.2f ms)  %.3e photons/s\n",
-                        backend.c_str(), mode.c_str(), static_cast<unsigned long long>(n), r,
-                        t.kernel_ms, t.total_ms, t.d2h_ms, pps_k);
+            std::printf(
+                "%-8s %-8s n=%-10llu rep %d: kernel %10.2f ms  total %10.2f ms  "
+                "(D2H %8.2f ms)  %.3e photons/s\n",
+                backend.c_str(), mode.c_str(), static_cast<unsigned long long>(n), r, t.kernel_ms,
+                t.total_ms, t.d2h_ms, pps_k);
             std::fflush(stdout);
           }
         }

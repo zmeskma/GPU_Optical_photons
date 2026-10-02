@@ -28,12 +28,12 @@ constexpr int kAllThreads = 0;
 
 // INFO (shown on failure) + an always-printed line, so that `ctest -V` or
 // running the executable directly shows the actual pulls / p-values.
-#define REPORT(expr)                                                \
-  INFO(expr);                                                       \
-  do {                                                              \
-    std::ostringstream report_os_;                                  \
-    report_os_ << expr;                                             \
-    std::printf("[validation] %s\n", report_os_.str().c_str());     \
+#define REPORT(expr)                                            \
+  INFO(expr);                                                   \
+  do {                                                          \
+    std::ostringstream report_os_;                              \
+    report_os_ << expr;                                         \
+    std::printf("[validation] %s\n", report_os_.str().c_str()); \
   } while (0)
 
 // Analytic-test baseline: index-matched readout, all other faces black, no
@@ -74,8 +74,8 @@ int face_of(float x, float y, float z, const SimParams& p) {
 
 TEST_CASE("Analytic helpers: quadrature reproduces the rectangle solid angle", "[analytic]") {
   SimParams p = black_box();
-  for (auto [x, y, z] : {std::tuple{0.f, 0.f, 0.f}, {10.f, -5.f, 3.f}, {0.f, 0.f, 24.f},
-                         {20.f, 20.f, -20.f}}) {
+  for (auto [x, y, z] :
+       {std::tuple{0.f, 0.f, 0.f}, {10.f, -5.f, 3.f}, {0.f, 0.f, 24.f}, {20.f, 20.f, -20.f}}) {
     p.src_x = x;
     p.src_y = y;
     p.src_z = z;
@@ -95,8 +95,10 @@ TEST_CASE("Validation 1: detection fraction equals solid angle / 4pi", "[validat
   struct Case {
     float sx, sy, sz, size_x, size_y, size_z;
   };
-  const Case cases[] = {{0, 0, 0, 50, 50, 50},     {10, -5, 3, 50, 50, 50},
-                        {0, 0, 20, 50, 50, 50},    {20, 20, -20, 50, 50, 50},
+  const Case cases[] = {{0, 0, 0, 50, 50, 50},
+                        {10, -5, 3, 50, 50, 50},
+                        {0, 0, 20, 50, 50, 50},
+                        {20, 20, -20, 50, 50, 50},
                         {5, 10, -4, 30, 50, 20}};
   const uint64_t n = 2000000;
   for (const Case& c : cases) {
@@ -126,8 +128,8 @@ TEST_CASE("Validation 1: detection fraction equals solid angle / 4pi", "[validat
       const double expected = analytic::face_solid_angle_fraction(p, f);
       const double pull = binomial_pull(per_face[f], n, expected);
       REPORT("source (" << c.sx << "," << c.sy << "," << c.sz << ") face " << f << ": MC "
-                      << static_cast<double>(per_face[f]) / n << " analytic " << expected
-                      << " pull " << pull);
+                        << static_cast<double>(per_face[f]) / n << " analytic " << expected
+                        << " pull " << pull);
       CHECK(std::fabs(pull) < 4.0);
     }
   }
@@ -187,7 +189,8 @@ TEST_CASE("Validation 1c: time of flight and emission-time distribution", "[vali
     t_emit.push_back(rec.t[i] - rec.path[i] * inv_speed);
   }
   // t - path * n / c must be the sampled emission time, i.e. Exp(tau).
-  const auto ks = stats::ks_one_sample(t_emit, [&](double t) { return 1.0 - std::exp(-t / p.tau); });
+  const auto ks =
+      stats::ks_one_sample(t_emit, [&](double t) { return 1.0 - std::exp(-t / p.tau); });
   REPORT("KS D = " << ks.d << ", p = " << ks.pvalue);
   CHECK(ks.pvalue > 1e-4);
 }
@@ -213,9 +216,9 @@ TEST_CASE("Validation 2: bulk absorption against the attenuated solid angle", "[
     const double p_abs = 1.0 - analytic::box_survival_fraction(p, L);
     const double pull_det = binomial_pull(c[0], n, p_det);
     const double pull_abs = binomial_pull(c[1], n, p_abs);
-    REPORT("L = " << L << ": P_det MC " << double(c[0]) / n << " expected " << p_det
-                << " (pull " << pull_det << "); P_abs MC " << double(c[1]) / n << " expected "
-                << p_abs << " (pull " << pull_abs << ")");
+    REPORT("L = " << L << ": P_det MC " << double(c[0]) / n << " expected " << p_det << " (pull "
+                  << pull_det << "); P_abs MC " << double(c[1]) / n << " expected " << p_abs
+                  << " (pull " << pull_abs << ")");
     CHECK(std::fabs(pull_det) < 4.0);
     CHECK(std::fabs(pull_abs) < 4.0);
   }
@@ -246,7 +249,7 @@ TEST_CASE("Validation 3: Rayleigh scattering in a symmetric cube", "[validation]
   const double expected = analytic::face_survival_fraction(p, kReadoutFace, p.scat_length);
   const double pull_u = binomial_pull(unscattered, n, expected);
   REPORT("unscattered detected " << double(unscattered) / n << " expected " << expected << " pull "
-                               << pull_u);
+                                 << pull_u);
   CHECK(std::fabs(pull_u) < 4.0);
   CHECK(scatters > n);  // mean number of scatters > 1 for L_s = 15 mm in a 50 mm cube
 }
@@ -286,7 +289,7 @@ TEST_CASE("Validation 5: escape cone of a perfectly specular box", "[validation]
   const double expected = analytic::mirror_box_escape_fraction(p.n_scint, p.n_det);
   const double pull = binomial_pull(c[0], n, expected);
   REPORT("P_det = " << double(c[0]) / n << " expected 1 - cos(theta_c) = " << expected << " pull "
-                  << pull);
+                    << pull);
   CHECK(std::fabs(pull) < 4.0);
   CHECK(c[0] + c[4] == n);  // detected or trapped, nothing else
 }

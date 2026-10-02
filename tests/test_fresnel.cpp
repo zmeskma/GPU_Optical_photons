@@ -62,7 +62,8 @@ TEST_CASE("Fresnel: total internal reflection beyond the critical angle", "[fres
     CHECK(f.cos_t == 0.0f);
   }
   // Just below the critical angle: R < 1 but approaching 1 continuously.
-  const auto just_below = fresnel_unpolarized(1.63f, 1.0f, static_cast<float>(std::cos(theta_c - 1e-4)));
+  const auto just_below =
+      fresnel_unpolarized(1.63f, 1.0f, static_cast<float>(std::cos(theta_c - 1e-4)));
   CHECK(just_below.reflectance < 1.0f);
   CHECK(just_below.reflectance > 0.9f);
   const auto below = fresnel_unpolarized(1.63f, 1.0f, static_cast<float>(std::cos(theta_c - 1e-2)));
@@ -121,10 +122,10 @@ TEST_CASE("Refraction: unit length, Snell's law, coplanarity, reversibility", "[
       ++refracted;
       const Vec3 t = refract(d, n, n1 / n2, cos_i, f.cos_t);
       CHECK_THAT(norm(t), WithinAbs(1.0, 1e-6));
-      CHECK(dot(t, n) > 0.0f);                                     // goes into medium 2
-      CHECK_THAT(dot(t, n), WithinAbs(f.cos_t, 2e-6));             // the angle is cos_t
+      CHECK(dot(t, n) > 0.0f);                          // goes into medium 2
+      CHECK_THAT(dot(t, n), WithinAbs(f.cos_t, 2e-6));  // the angle is cos_t
       CHECK_THAT(n1 * sin_angle(d, n), WithinAbs(n2 * sin_angle(t, n), 3e-6));  // Snell
-      CHECK_THAT(dot(t, cross(d, n)), WithinAbs(0.0, 2e-6));      // plane of incidence
+      CHECK_THAT(dot(t, cross(d, n)), WithinAbs(0.0, 2e-6));  // plane of incidence
 
       // Going back through the interface recovers the original direction.
       const Vec3 back = refract(-t, -n, n2 / n1, dot(t, n), cos_i);

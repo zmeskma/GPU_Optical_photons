@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # CPU path: build and run every test (unit, validation, config) with two
+  # compilers, plus the portable-math variant of the physics.
+  cpu:
+    name: CPU ${{ matrix.compiler }}${{ matrix.portable == 'ON' && ' (portable math)' || '' }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { compiler: gcc, cxx: g++, portable: "OFF" }
+          - { compiler: clang, cxx: clang++, portable: "OFF" }
+          - { compiler: gcc, cxx: g++, portable: "ON" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libomp-dev
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+          -DWITH_CUDA=OFF -DOPTPHOT_PORTABLE_MATH=${{ matrix.portable }}
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Validation summary (printed pulls)
+        run: ./build/tests/validation_tests | grep "\[validation\]"
+
+  # Python analysis scripts run end to end against the CPU executable
+  # (small photon counts; figures go to a scratch directory).
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build
+          pip install -r python/requirements.txt
+      - name: Build CPU executables
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPTPHOT_BUILD_TESTS=OFF
+          cmake --build build
+      - name: Run analysis scripts
+        run: |
+          mkdir -p /tmp/figs
+          python python/run_validation.py --exe build/apps/optphot --n 1e5 --outdir /tmp/figs --summary /tmp/figs/summary.json
+          python python/divergence_estimate.py --exe build/apps/optphot --n 1e5 --outdir /tmp/figs
+          ./build/apps/optphot_bench --sizes 1e4,1e5 --repeat 1 --csv /tmp/figs/bench.csv
+          python python/plot_benchmarks.py /tmp/figs/bench.csv --outdir /tmp/figs
+          ./build/apps/optphot --n 1e5 --out /tmp/a > /dev/null
+          ./build/apps/optphot --n 1e5 --seed 7 --out /tmp/b > /dev/null
+          python python/compare_runs.py /tmp/a /tmp/b
+
+  # CUDA path: compile everything (library, apps, GPU tests) with nvcc.
+  # GitHub-hosted runners have no GPU, so nothing is executed here; the GPU
+  # tests run in notebooks/run_on_colab.ipynb.
+  cuda-compile:
+    name: CUDA compile (${{ matrix.variant }})
+    runs-on: ubuntu-24.04
+    container: nvidia/cuda:12.4.1-devel-ubuntu22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { variant: default, flags: "" }
+          - { variant: reproducible, flags: "-DOPTPHOT_PORTABLE_MATH=ON -DOPTPHOT_CUDA_FMAD=OFF" }
+    steps:
+      - name: Install build tools
+        run: apt-get update && apt-get install -y --no-install-recommends cmake ninja-build g++ git ca-certificates
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DWITH_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="75;86" ${{ matrix.flags }}
+      - name: Build
+        run: cmake --build build
+      - name: Check that the GPU test binary was produced
+        run: ls -l build/tests/gpu_tests build/apps/optphot_compare build/apps/optphot_bench

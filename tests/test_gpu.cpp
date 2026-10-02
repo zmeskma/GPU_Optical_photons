@@ -109,8 +109,9 @@ TEST_CASE("GPU vs CPU: statistical agreement with independent seeds", "[gpu]") {
   pg.seed = p.seed + 1;
   run_gpu_records(pg, n, gpu);
   const DistributionComparison d = compare_distributions(cpu, gpu, p);
-  std::printf("[gpu] independent seeds: eff z = %.2f, time chi2 p = %.3f, KS p = %.3f, xy chi2 p = %.3f\n",
-              d.eff_z, d.time_chi2.pvalue, d.time_ks.pvalue, d.xy_chi2.pvalue);
+  std::printf(
+      "[gpu] independent seeds: eff z = %.2f, time chi2 p = %.3f, KS p = %.3f, xy chi2 p = %.3f\n",
+      d.eff_z, d.time_chi2.pvalue, d.time_ks.pvalue, d.xy_chi2.pvalue);
   CHECK(std::fabs(d.eff_z) < 4.0);
   CHECK(d.time_chi2.pvalue > 1e-4);
   CHECK(d.time_ks.pvalue > 1e-4);

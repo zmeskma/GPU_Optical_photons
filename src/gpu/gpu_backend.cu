@@ -38,13 +38,13 @@ namespace optphot {
 
 namespace {
 
-#define CUDA_CHECK(call)                                                                       \
-  do {                                                                                         \
-    const cudaError_t err_ = (call);                                                           \
-    if (err_ != cudaSuccess) {                                                                 \
+#define CUDA_CHECK(call)                                                                         \
+  do {                                                                                           \
+    const cudaError_t err_ = (call);                                                             \
+    if (err_ != cudaSuccess) {                                                                   \
       throw std::runtime_error(std::string("CUDA error: ") + cudaGetErrorString(err_) + " at " + \
-                               __FILE__ + ":" + std::to_string(__LINE__) + " (" #call ")");    \
-    }                                                                                          \
+                               __FILE__ + ":" + std::to_string(__LINE__) + " (" #call ")");      \
+    }                                                                                            \
   } while (0)
 
 // Device pointers of the structure-of-arrays record buffers.
@@ -170,8 +170,8 @@ std::string gpu_device_name() {
   if (cudaGetDevice(&dev) != cudaSuccess || cudaGetDeviceProperties(&prop, dev) != cudaSuccess) {
     return "none";
   }
-  return std::string(prop.name) + " (sm_" + std::to_string(prop.major) + std::to_string(prop.minor) +
-         ", " + std::to_string(prop.multiProcessorCount) + " SMs)";
+  return std::string(prop.name) + " (sm_" + std::to_string(prop.major) +
+         std::to_string(prop.minor) + ", " + std::to_string(prop.multiProcessorCount) + " SMs)";
 }
 
 RunTiming run_gpu_records(const SimParams& p, uint64_t n, PhotonRecords& out, int block_size,
@@ -204,14 +204,18 @@ RunTiming run_gpu_records(const SimParams& p, uint64_t n, PhotonRecords& out, in
     // a pinned buffer. Pinned host memory + streams would allow faster,
     // asynchronous copies overlapping the next chunk's kernel (see README).
     CUDA_CHECK(cudaEventRecord(copy_ev.start));
-    CUDA_CHECK(cudaMemcpy(out.fate.data() + done, dev.fate, m * sizeof(uint8_t), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.n_boundary.data() + done, dev.n_boundary, m * sizeof(uint32_t), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.n_scatter.data() + done, dev.n_scatter, m * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(
+        cudaMemcpy(out.fate.data() + done, dev.fate, m * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(out.n_boundary.data() + done, dev.n_boundary, m * sizeof(uint32_t),
+                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(out.n_scatter.data() + done, dev.n_scatter, m * sizeof(uint32_t),
+                          cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaMemcpy(out.t.data() + done, dev.t, m * sizeof(float), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaMemcpy(out.x.data() + done, dev.x, m * sizeof(float), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaMemcpy(out.y.data() + done, dev.y, m * sizeof(float), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaMemcpy(out.z.data() + done, dev.z, m * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.path.data() + done, dev.path, m * sizeof(float), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(
+        cudaMemcpy(out.path.data() + done, dev.path, m * sizeof(float), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaEventRecord(copy_ev.stop));
     timing.d2h_ms += copy_ev.elapsed_ms();
   }
@@ -244,8 +248,8 @@ RunTiming run_gpu_tally(const SimParams& p, const TallyConfig& c, uint64_t n, Ta
   CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks_per_sm, transport_tally_kernel,
                                                            block_size, shared_bytes));
   const uint64_t needed = (n + block_size - 1) / block_size;
-  const unsigned grid = static_cast<unsigned>(
-      std::max<uint64_t>(1, std::min<uint64_t>(needed, static_cast<uint64_t>(blocks_per_sm) * n_sm)));
+  const unsigned grid = static_cast<unsigned>(std::max<uint64_t>(
+      1, std::min<uint64_t>(needed, static_cast<uint64_t>(blocks_per_sm) * n_sm)));
   // The block-private counters are 32-bit: a block must not see 2^32 photons.
   if (n / grid >= 0xffffffffull) {
     throw std::runtime_error("too many photons for one tally launch; split the run");

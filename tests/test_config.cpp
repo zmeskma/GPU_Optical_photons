@@ -57,7 +57,8 @@ TEST_CASE("NPY writer produces an aligned, well-formed header", "[config]") {
   std::filesystem::remove(path);
   REQUIRE(bytes.size() >= 10);
   CHECK(bytes.substr(1, 5) == "NUMPY");
-  const std::size_t hlen = static_cast<unsigned char>(bytes[8]) | (static_cast<unsigned char>(bytes[9]) << 8);
+  const std::size_t hlen =
+      static_cast<unsigned char>(bytes[8]) | (static_cast<unsigned char>(bytes[9]) << 8);
   CHECK((10 + hlen) % 64 == 0);
   CHECK(bytes.size() == 10 + hlen + sizeof(data));
   CHECK(bytes.find("'shape': (3,)") != std::string::npos);

@@ -106,7 +106,9 @@ TEST_CASE("Uniform deviates are statistically uniform and uncorrelated", "[rng]"
 
 TEST_CASE("chi2 p-value helper matches known values", "[rng][stats]") {
   // Reference values from scipy.stats.chi2.sf
-  CHECK_THAT(stats::chi2_pvalue(10.0, 10.0), Catch::Matchers::WithinRel(0.44049328506521257, 1e-10));
+  CHECK_THAT(stats::chi2_pvalue(10.0, 10.0),
+             Catch::Matchers::WithinRel(0.44049328506521257, 1e-10));
   CHECK_THAT(stats::chi2_pvalue(3.0, 1.0), Catch::Matchers::WithinRel(0.08326451666355039, 1e-10));
-  CHECK_THAT(stats::chi2_pvalue(150.0, 100.0), Catch::Matchers::WithinRel(0.0009039320423540184, 1e-8));
+  CHECK_THAT(stats::chi2_pvalue(150.0, 100.0),
+             Catch::Matchers::WithinRel(0.0009039320423540184, 1e-8));
 }

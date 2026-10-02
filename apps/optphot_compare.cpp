@@ -53,13 +53,15 @@ int main(int argc, char** argv) {
                 static_cast<unsigned long long>(h.bitwise_identical),
                 static_cast<unsigned long long>(n), double(h.bitwise_identical) / n);
     std::printf("  same discrete history     : %llu / %llu (%.6f)\n",
-                static_cast<unsigned long long>(h.same_discrete), static_cast<unsigned long long>(n),
-                double(h.same_discrete) / n);
-    std::printf("  different fate            : %llu\n", static_cast<unsigned long long>(h.fate_differs));
-    std::printf("  max |dt| = %.3g ns, max |dpos| = %.3g mm (same discrete history)\n", h.max_abs_dt,
-                h.max_abs_dpos);
+                static_cast<unsigned long long>(h.same_discrete),
+                static_cast<unsigned long long>(n), double(h.same_discrete) / n);
+    std::printf("  different fate            : %llu\n",
+                static_cast<unsigned long long>(h.fate_differs));
+    std::printf("  max |dt| = %.3g ns, max |dpos| = %.3g mm (same discrete history)\n",
+                h.max_abs_dt, h.max_abs_dpos);
     std::printf("\nIndependent seeds (CPU seed %llu vs GPU seed %llu):\n",
-                static_cast<unsigned long long>(p.seed), static_cast<unsigned long long>(p_indep.seed));
+                static_cast<unsigned long long>(p.seed),
+                static_cast<unsigned long long>(p_indep.seed));
     std::printf("  efficiency CPU %.6f +- %.6f, GPU %.6f +- %.6f, z = %.2f\n", indep.eff_a,
                 indep.err_a, indep.eff_b, indep.err_b, indep.eff_z);
     std::printf("  arrival time: chi2/ndf = %.1f/%d (p = %.3f), KS D = %.2e (p = %.3f)\n",
@@ -67,8 +69,9 @@ int main(int argc, char** argv) {
                 indep.time_ks.pvalue);
     std::printf("  hit position: chi2/ndf = %.1f/%d (p = %.3f)\n", indep.xy_chi2.chi2,
                 indep.xy_chi2.ndf, indep.xy_chi2.pvalue);
-    std::printf("\nTiming: CPU %.1f ms (%d threads); GPU kernel %.1f ms, D2H %.1f ms\n", tc.total_ms,
-                o.threads == 0 ? cpu_max_threads() : o.threads, tg.kernel_ms, tg.d2h_ms);
+    std::printf("\nTiming: CPU %.1f ms (%d threads); GPU kernel %.1f ms, D2H %.1f ms\n",
+                tc.total_ms, o.threads == 0 ? cpu_max_threads() : o.threads, tg.kernel_ms,
+                tg.d2h_ms);
 
     if (!o.out.empty()) {
       const std::string meta = params_to_json(p, o);

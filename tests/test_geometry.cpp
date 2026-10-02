@@ -20,8 +20,8 @@ TEST_CASE("Distance to exit along the axes", "[geometry]") {
     Vec3 d;
     int face;
     float dist;
-  } cases[] = {{{1, 0, 0}, 1, hx}, {{-1, 0, 0}, 0, hx}, {{0, 1, 0}, 3, hy},
-               {{0, -1, 0}, 2, hy}, {{0, 0, 1}, 5, hz}, {{0, 0, -1}, 4, hz}};
+  } cases[] = {{{1, 0, 0}, 1, hx},  {{-1, 0, 0}, 0, hx}, {{0, 1, 0}, 3, hy},
+               {{0, -1, 0}, 2, hy}, {{0, 0, 1}, 5, hz},  {{0, 0, -1}, 4, hz}};
   for (const auto& c : cases) {
     const BoxHit h = distance_to_box_exit(o, c.d, hx, hy, hz);
     CHECK(h.face == c.face);

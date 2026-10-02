@@ -54,10 +54,14 @@ std::string json_float(float f) {
 
 std::string surface_name(Surface s) {
   switch (s) {
-    case Surface::Polished: return "polished";
-    case Surface::Black: return "black";
-    case Surface::Specular: return "specular";
-    case Surface::Lambertian: return "lambertian";
+    case Surface::Polished:
+      return "polished";
+    case Surface::Black:
+      return "black";
+    case Surface::Specular:
+      return "specular";
+    case Surface::Lambertian:
+      return "lambertian";
   }
   return "?";
 }
@@ -66,55 +70,92 @@ std::string source_name(SourceType s) { return s == SourceType::Point ? "point" 
 
 std::string fate_name(Fate f) {
   switch (f) {
-    case Fate::Detected: return "detected";
-    case Fate::AbsorbedBulk: return "absorbed_bulk";
-    case Fate::AbsorbedSurface: return "absorbed_surface";
-    case Fate::Escaped: return "escaped";
-    case Fate::MaxSteps: return "max_steps";
+    case Fate::Detected:
+      return "detected";
+    case Fate::AbsorbedBulk:
+      return "absorbed_bulk";
+    case Fate::AbsorbedSurface:
+      return "absorbed_surface";
+    case Fate::Escaped:
+      return "escaped";
+    case Fate::MaxSteps:
+      return "max_steps";
   }
   return "?";
 }
 
 void apply_setting(SimParams& p, RunOptions& o, const std::string& key, const std::string& v) {
-  if (key == "size_x") p.hx = 0.5f * to_float(key, v);
-  else if (key == "size_y") p.hy = 0.5f * to_float(key, v);
-  else if (key == "size_z") p.hz = 0.5f * to_float(key, v);
-  else if (key == "n_scint") p.n_scint = to_float(key, v);
-  else if (key == "n_det") p.n_det = to_float(key, v);
-  else if (key == "n_out") p.n_out = to_float(key, v);
-  else if (key == "abs_length") p.abs_length = to_float(key, v);
-  else if (key == "scat_length") p.scat_length = to_float(key, v);
-  else if (key == "reflectivity") p.reflectivity = to_float(key, v);
-  else if (key == "src_x") p.src_x = to_float(key, v);
-  else if (key == "src_y") p.src_y = to_float(key, v);
-  else if (key == "src_z") p.src_z = to_float(key, v);
-  else if (key == "tau") p.tau = to_float(key, v);
-  else if (key == "max_steps") p.max_steps = static_cast<uint32_t>(to_u64(key, v));
-  else if (key == "seed") p.seed = to_u64(key, v);
+  if (key == "size_x")
+    p.hx = 0.5f * to_float(key, v);
+  else if (key == "size_y")
+    p.hy = 0.5f * to_float(key, v);
+  else if (key == "size_z")
+    p.hz = 0.5f * to_float(key, v);
+  else if (key == "n_scint")
+    p.n_scint = to_float(key, v);
+  else if (key == "n_det")
+    p.n_det = to_float(key, v);
+  else if (key == "n_out")
+    p.n_out = to_float(key, v);
+  else if (key == "abs_length")
+    p.abs_length = to_float(key, v);
+  else if (key == "scat_length")
+    p.scat_length = to_float(key, v);
+  else if (key == "reflectivity")
+    p.reflectivity = to_float(key, v);
+  else if (key == "src_x")
+    p.src_x = to_float(key, v);
+  else if (key == "src_y")
+    p.src_y = to_float(key, v);
+  else if (key == "src_z")
+    p.src_z = to_float(key, v);
+  else if (key == "tau")
+    p.tau = to_float(key, v);
+  else if (key == "max_steps")
+    p.max_steps = static_cast<uint32_t>(to_u64(key, v));
+  else if (key == "seed")
+    p.seed = to_u64(key, v);
   else if (key == "surface") {
-    if (v == "polished") p.surface = Surface::Polished;
-    else if (v == "black") p.surface = Surface::Black;
-    else if (v == "specular") p.surface = Surface::Specular;
-    else if (v == "lambertian") p.surface = Surface::Lambertian;
-    else throw std::runtime_error("surface must be polished|black|specular|lambertian, got '" + v + "'");
+    if (v == "polished")
+      p.surface = Surface::Polished;
+    else if (v == "black")
+      p.surface = Surface::Black;
+    else if (v == "specular")
+      p.surface = Surface::Specular;
+    else if (v == "lambertian")
+      p.surface = Surface::Lambertian;
+    else
+      throw std::runtime_error("surface must be polished|black|specular|lambertian, got '" + v +
+                               "'");
   } else if (key == "source") {
-    if (v == "point") p.source = SourceType::Point;
-    else if (v == "volume") p.source = SourceType::UniformVolume;
-    else throw std::runtime_error("source must be point|volume, got '" + v + "'");
+    if (v == "point")
+      p.source = SourceType::Point;
+    else if (v == "volume")
+      p.source = SourceType::UniformVolume;
+    else
+      throw std::runtime_error("source must be point|volume, got '" + v + "'");
   } else if (key == "backend") {
     if (v != "cpu" && v != "gpu") throw std::runtime_error("backend must be cpu|gpu");
     o.backend = v;
   } else if (key == "mode") {
     if (v != "records" && v != "tally") throw std::runtime_error("mode must be records|tally");
     o.mode = v;
-  } else if (key == "n_photons" || key == "n") o.n_photons = to_u64(key, v);
-  else if (key == "threads") o.threads = static_cast<int>(to_u64(key, v));
-  else if (key == "block_size") o.block_size = static_cast<int>(to_u64(key, v));
-  else if (key == "out") o.out = v;
-  else if (key == "time_bins") o.tally.time_bins = static_cast<uint32_t>(to_u64(key, v));
-  else if (key == "time_max") o.tally.time_max = to_float(key, v);
-  else if (key == "xy_bins") o.tally.xy_bins = static_cast<uint32_t>(to_u64(key, v));
-  else throw std::runtime_error("unknown setting '" + key + "'");
+  } else if (key == "n_photons" || key == "n")
+    o.n_photons = to_u64(key, v);
+  else if (key == "threads")
+    o.threads = static_cast<int>(to_u64(key, v));
+  else if (key == "block_size")
+    o.block_size = static_cast<int>(to_u64(key, v));
+  else if (key == "out")
+    o.out = v;
+  else if (key == "time_bins")
+    o.tally.time_bins = static_cast<uint32_t>(to_u64(key, v));
+  else if (key == "time_max")
+    o.tally.time_max = to_float(key, v);
+  else if (key == "xy_bins")
+    o.tally.xy_bins = static_cast<uint32_t>(to_u64(key, v));
+  else
+    throw std::runtime_error("unknown setting '" + key + "'");
 }
 
 void load_config_file(const std::string& path, SimParams& p, RunOptions& o) {
@@ -178,8 +219,10 @@ bool parse_command_line(int argc, char** argv, SimParams& p, RunOptions& o) {
       key = arg;
       value = argv[++i];
     }
-    if (key == "config") load_config_file(value, p, o);
-    else apply_setting(p, o, key, value);
+    if (key == "config")
+      load_config_file(value, p, o);
+    else
+      apply_setting(p, o, key, value);
   }
   return true;
 }
@@ -202,8 +245,9 @@ std::string params_to_json(const SimParams& p, const RunOptions& o) {
      << "  \"backend\": \"" << o.backend << "\", \"mode\": \"" << o.mode
      << "\", \"n_photons\": " << o.n_photons << ", \"threads\": " << o.threads
      << ", \"block_size\": " << o.block_size << ",\n"
-     << "  \"time_bins\": " << o.tally.time_bins << ", \"time_max\": " << json_float(o.tally.time_max)
-     << ", \"xy_bins\": " << o.tally.xy_bins << "\n"
+     << "  \"time_bins\": " << o.tally.time_bins
+     << ", \"time_max\": " << json_float(o.tally.time_max) << ", \"xy_bins\": " << o.tally.xy_bins
+     << "\n"
      << "}";
   return os.str();
 }

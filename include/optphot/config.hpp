@@ -13,12 +13,12 @@
 namespace optphot {
 
 struct RunOptions {
-  std::string backend = "cpu";  // cpu | gpu
+  std::string backend = "cpu";   // cpu | gpu
   std::string mode = "records";  // records | tally
   uint64_t n_photons = 1000000;
-  int threads = 1;  // CPU: 1 serial, 0 all OpenMP threads
+  int threads = 1;       // CPU: 1 serial, 0 all OpenMP threads
   int block_size = 256;  // GPU threads per block
-  std::string out;  // output directory ("" = no output)
+  std::string out;       // output directory ("" = no output)
   TallyConfig tally;
 };
 

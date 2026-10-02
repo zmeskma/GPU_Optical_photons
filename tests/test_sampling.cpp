@@ -46,7 +46,12 @@ double mean(const std::vector<float>& v) {
 
 TEST_CASE("Orthonormal basis is orthonormal, including near the poles", "[sampling]") {
   PhiloxStream rng(5u, 0u);
-  std::vector<Vec3> normals = {{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0},
+  std::vector<Vec3> normals = {{0, 0, 1},
+                               {0, 0, -1},
+                               {1, 0, 0},
+                               {-1, 0, 0},
+                               {0, 1, 0},
+                               {0, -1, 0},
                                normalize(Vec3{1e-4f, 0, -1})};
   for (int i = 0; i < 1000; ++i) normals.push_back(sample_isotropic(rng.uniform(), rng.uniform()));
   for (const Vec3 n : normals) {
@@ -117,8 +122,8 @@ TEST_CASE("Rayleigh scattering: phase function, moments and geometry", "[samplin
 
 TEST_CASE("Lambertian reflection: cosine-weighted hemisphere", "[sampling]") {
   PhiloxStream rng(8u, 0u);
-  for (const Vec3 n : {Vec3{0, 0, 1}, Vec3{0, 0, -1}, Vec3{1, 0, 0}, Vec3{0, -1, 0},
-                       normalize(Vec3{1, 2, 3})}) {
+  for (const Vec3 n :
+       {Vec3{0, 0, 1}, Vec3{0, 0, -1}, Vec3{1, 0, 0}, Vec3{0, -1, 0}, normalize(Vec3{1, 2, 3})}) {
     std::vector<float> cosines;
     for (int i = 0; i < kN / 4; ++i) {
       const Vec3 d = sample_lambertian(n, rng.uniform(), rng.uniform());
@@ -142,12 +147,13 @@ TEST_CASE("Exponential path lengths and emission times", "[sampling]") {
   }
   CHECK_THAT(mean(s), WithinAbs(250.0, 5 * 250.0 / std::sqrt(kN)));
   CHECK_THAT(mean(t), WithinAbs(4.0, 5 * 4.0 / std::sqrt(kN)));
-  CHECK(histogram_test(s, 0, 1000, [](double x) { return 1 - std::exp(-x / 250.0); }).pvalue > 1e-4);
+  CHECK(histogram_test(s, 0, 1000, [](double x) { return 1 - std::exp(-x / 250.0); }).pvalue >
+        1e-4);
 
   // Disabled process / prompt emission.
   CHECK(is_inf(sample_exponential(kInfinity, 0.5f)));
   CHECK(is_inf(sample_exponential(kInfinity, 1.0f)));  // no 0 * inf = NaN
-  CHECK(sample_exponential(250.0f, 1.0f) == 0.0f);      // u = 1 is the largest deviate
+  CHECK(sample_exponential(250.0f, 1.0f) == 0.0f);     // u = 1 is the largest deviate
   CHECK(sample_emission_time(0.0f, 0.3f) == 0.0f);
 }
 

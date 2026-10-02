@@ -50,8 +50,7 @@ int main(int argc, char** argv) {
                 static_cast<unsigned long long>(o.n_photons), o.backend.c_str(), o.mode.c_str(),
                 surface_name(p.surface).c_str(), source_name(p.source).c_str());
     if (o.backend == "cpu") {
-      std::printf("CPU threads: %d (OpenMP %s)\n",
-                  o.threads == 0 ? cpu_max_threads() : o.threads,
+      std::printf("CPU threads: %d (OpenMP %s)\n", o.threads == 0 ? cpu_max_threads() : o.threads,
                   cpu_has_openmp() ? "available" : "not available");
     }
 #if defined(OPTPHOT_HAVE_CUDA)
@@ -66,7 +65,8 @@ int main(int argc, char** argv) {
       RunTiming tm;
       if (o.backend == "cpu") tm = run_cpu_records(p, o.n_photons, rec, o.threads);
 #if defined(OPTPHOT_HAVE_CUDA)
-      else tm = run_gpu_records(p, o.n_photons, rec, o.block_size);
+      else
+        tm = run_gpu_records(p, o.n_photons, rec, o.block_size);
 #endif
       std::array<uint64_t, kNumFates> counts{};
       double nb = 0;
@@ -81,7 +81,8 @@ int main(int argc, char** argv) {
       RunTiming tm;
       if (o.backend == "cpu") tm = run_cpu_tally(p, o.tally, o.n_photons, tally, o.threads);
 #if defined(OPTPHOT_HAVE_CUDA)
-      else tm = run_gpu_tally(p, o.tally, o.n_photons, tally, o.block_size);
+      else
+        tm = run_gpu_tally(p, o.tally, o.n_photons, tally, o.block_size);
 #endif
       print_summary(tally.fate_counts, o.n_photons, tm,
                     static_cast<double>(tally.boundary_sum) / o.n_photons);
