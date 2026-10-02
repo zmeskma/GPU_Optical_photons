@@ -1,0 +1,172 @@
+{
+ "black_box": {
+  "history": {
+   "n": 2000000,
+   "bitwise_identical": 713764,
+   "same_discrete": 2000000,
+   "fate_differs": 0,
+   "frac_bitwise": 0.356882,
+   "frac_same_discrete": 1,
+   "max_abs_dt_ns": 8.940696716e-08,
+   "max_abs_dpos_mm": 2.218189878e-05,
+   "first_divergent": -1
+  },
+  "independent": {
+   "eff_a": 0.1761775,
+   "eff_b": 0.1766435,
+   "err_a": 0.0002693872570239264,
+   "err_b": 0.00026966699270373264,
+   "eff_z": -1.2225549314609525,
+   "time_chi2": 52.347141194201825,
+   "time_ndf": 56,
+   "time_chi2_p": 0.6139279234727809,
+   "xy_chi2": 407.8739372770011,
+   "xy_ndf": 399,
+   "xy_chi2_p": 0.3686639197657276,
+   "time_ks_d": 0.0025674104690551758,
+   "time_ks_p": 0.19492493569850922
+  },
+  "device": "NVIDIA GeForce GTX 1660 Ti (sm_75, 24 SMs)",
+  "timing_ms": {
+   "cpu_total": 62.2697,
+   "gpu_kernel": 0.277024,
+   "gpu_d2h": 9.779488
+  }
+ },
+ "absorption": {
+  "history": {
+   "n": 2000000,
+   "bitwise_identical": 646674,
+   "same_discrete": 2000000,
+   "fate_differs": 0,
+   "frac_bitwise": 0.323337,
+   "frac_same_discrete": 1,
+   "max_abs_dt_ns": 8.940696716e-08,
+   "max_abs_dpos_mm": 2.389900987e-05,
+   "first_divergent": -1
+  },
+  "independent": {
+   "eff_a": 0.0887555,
+   "eff_b": 0.0890495,
+   "err_a": 0.00020109445693473256,
+   "err_b": 0.00020139474490382068,
+   "eff_z": -1.0330182020307612,
+   "time_chi2": 68.77266505067026,
+   "time_ndf": 44,
+   "time_chi2_p": 0.009866956698979192,
+   "xy_chi2": 411.1421223017221,
+   "xy_ndf": 399,
+   "xy_chi2_p": 0.32668498085891756,
+   "time_ks_d": 0.004633456468582153,
+   "time_ks_p": 0.0438394732773304
+  },
+  "device": "NVIDIA GeForce GTX 1660 Ti (sm_75, 24 SMs)",
+  "timing_ms": {
+   "cpu_total": 71.0268,
+   "gpu_kernel": 0.2968,
+   "gpu_d2h": 9.859776
+  }
+ },
+ "polished": {
+  "history": {
+   "n": 2000000,
+   "bitwise_identical": 798793,
+   "same_discrete": 2000000,
+   "fate_differs": 0,
+   "frac_bitwise": 0.3993965,
+   "frac_same_discrete": 1,
+   "max_abs_dt_ns": 3.242492676e-05,
+   "max_abs_dpos_mm": 0.001090336726,
+   "first_divergent": -1
+  },
+  "independent": {
+   "eff_a": 0.452892,
+   "eff_b": 0.453871,
+   "err_a": 0.0003519807070962839,
+   "err_b": 0.00035204553353153053,
+   "eff_z": -1.9665674257528007,
+   "time_chi2": 98.12751425143657,
+   "time_ndf": 92,
+   "time_chi2_p": 0.3117216841839196,
+   "xy_chi2": 434.2994297815128,
+   "xy_ndf": 399,
+   "xy_chi2_p": 0.10786517232377332,
+   "time_ks_d": 0.0012290477752685547,
+   "time_ks_p": 0.49962955713272095
+  },
+  "device": "NVIDIA GeForce GTX 1660 Ti (sm_75, 24 SMs)",
+  "timing_ms": {
+   "cpu_total": 93.3326,
+   "gpu_kernel": 2.795872,
+   "gpu_d2h": 9.9904
+  }
+ },
+ "lambertian": {
+  "history": {
+   "n": 2000000,
+   "bitwise_identical": 243990,
+   "same_discrete": 1999997,
+   "fate_differs": 1,
+   "frac_bitwise": 0.121995,
+   "frac_same_discrete": 0.9999985,
+   "max_abs_dt_ns": 0.03557109833,
+   "max_abs_dpos_mm": 4.875905158,
+   "first_divergent": 1254160
+  },
+  "independent": {
+   "eff_a": 0.681478,
+   "eff_b": 0.6805975,
+   "err_a": 0.0003294432694076478,
+   "err_b": 0.000329685109607448,
+   "eff_z": 1.8891842583282838,
+   "time_chi2": 72.42001327607507,
+   "time_ndf": 81,
+   "time_chi2_p": 0.7410583682776934,
+   "xy_chi2": 366.7809581086231,
+   "xy_ndf": 399,
+   "xy_chi2_p": 0.8747237067104658,
+   "time_ks_d": 0.0007019266486167908,
+   "time_ks_p": 0.8902479410171509
+  },
+  "device": "NVIDIA GeForce GTX 1660 Ti (sm_75, 24 SMs)",
+  "timing_ms": {
+   "cpu_total": 226.5733,
+   "gpu_kernel": 7.020544,
+   "gpu_d2h": 10.175424
+  }
+ },
+ "lambertian_repro": {
+  "history": {
+   "n": 2000000,
+   "bitwise_identical": 2000000,
+   "same_discrete": 2000000,
+   "fate_differs": 0,
+   "frac_bitwise": 1,
+   "frac_same_discrete": 1,
+   "max_abs_dt_ns": 0,
+   "max_abs_dpos_mm": 0,
+   "first_divergent": -1
+  },
+  "independent": {
+   "eff_a": 0.6814785,
+   "eff_b": 0.6806,
+   "err_a": 0.000329443131691761,
+   "err_b": 0.0003296844248671751,
+   "eff_z": 1.8848954484349558,
+   "time_chi2": 72.40650889197936,
+   "time_ndf": 81,
+   "time_chi2_p": 0.7414281771613027,
+   "xy_chi2": 366.52349733802043,
+   "xy_ndf": 399,
+   "xy_chi2_p": 0.8767008237686261,
+   "time_ks_d": 0.000702202320098877,
+   "time_ks_p": 0.8899732232093811
+  },
+  "device": "NVIDIA GeForce GTX 1660 Ti (sm_75, 24 SMs)",
+  "timing_ms": {
+   "cpu_total": 221.7233,
+   "gpu_kernel": 7.544832,
+   "gpu_d2h": 9.99536
+  }
+ }
+}

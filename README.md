@@ -18,16 +18,16 @@ can be checked. The point of the project is the engineering around it:
 - statistical validation;
 - an analysis of what limits a history-based GPU kernel.
 
-> **Status of the GPU results.** The CUDA code (`src/gpu/`, `tests/test_gpu.cpp`,
-> `apps/optphot_compare.cpp`) was developed on a machine without a CUDA
-> toolkit.
-> - Everything on the CPU path is built and tested here: 42 tests pass, and
->   so do the validation figures below.
-> - The CUDA sources are compiled by the `cuda-compile` CI job and run by
->   [`notebooks/run_on_colab.ipynb`](notebooks/run_on_colab.ipynb) on a Colab
->   GPU.
-> - GPU validation, CPU/GPU comparison and GPU benchmark figures are
->   produced by that notebook. Sections that need them say so explicitly.
+> **Where the numbers come from.**
+> - All results below were measured on one laptop: an AMD Ryzen 7 4800H
+>   (8 cores / 16 threads) and an NVIDIA GeForce GTX 1660 Ti (Turing, sm_75,
+>   24 SMs).
+> - The GPU code was built with nvcc 12.2 and the MSVC 14.44 host compiler on
+>   Windows; [`scripts/build_windows_cuda.bat`](scripts/build_windows_cuda.bat)
+>   does this without a system-wide CUDA install.
+> - CI compiles the CUDA targets on Linux.
+> - [`notebooks/run_on_colab.ipynb`](notebooks/run_on_colab.ipynb) reproduces
+>   everything on a Colab GPU. It has not been run on Colab yet.
 
 ---
 
@@ -224,6 +224,13 @@ ctest --test-dir build-gpu --output-on-failure
 | `OPTPHOT_CUDA_FMAD` | ON | allow `nvcc` to fuse a·b+c into FMA (nvcc's default) |
 | `OPTPHOT_PORTABLE_MATH` | OFF | use the portable `log/sincos/cbrt` from `pmath.hpp` (see §6) |
 
+**Windows without a CUDA toolkit install.**
+[`scripts/build_windows_cuda.bat`](scripts/build_windows_cuda.bat) uses
+conda-forge's CUDA 12.2 compiler packages, installed in a user folder with
+the standalone `micromamba` (no admin rights), plus Visual Studio's MSVC.
+The commands are in the script header. Run the executables with that
+environment's `Library\bin` on `PATH`, so that `cudart64_12.dll` is found.
+
 No GPU at hand? Open [`notebooks/run_on_colab.ipynb`](notebooks/run_on_colab.ipynb)
 in Google Colab with a GPU runtime. It builds everything with CUDA and runs
 all tests, the GPU validation, the CPU/GPU comparison and the benchmarks, then
@@ -370,6 +377,21 @@ Further tests cover the uniform volume source in a cube (P = 1/6), a
 lossless Lambertian box (everything detected), CPU results that are
 independent of the thread count, and tally mode agreeing with records mode.
 
+### 5.3 The same validation on the GPU backend
+
+`run_validation.py --backend gpu` repeats every scan above with the CUDA
+kernel, at 2·10⁶ photons per point. The figures are
+`docs/figures/gpu_validation_*.png`.
+
+| check | result |
+|---|---|
+| 55 scan points | pull mean −0.26, rms 1.11; Σ pull² = 71 for 55 points (p = 0.07); largest \|pull\| = 2.6 |
+| hit map, 625 bins | χ²/ndf = 675/625 (p = 0.08) |
+| emission time | KS p = 0.87 |
+| time of flight | 100% within the analytic bounds |
+
+![gpu pulls](docs/figures/gpu_validation_pulls.png)
+
 <a id="cpu-vs-gpu"></a>
 ## 6. CPU vs GPU, and why histories can differ
 
@@ -396,9 +418,45 @@ The GPU tests (`tests/test_gpu.cpp`) require:
 - bit-reproducible tallies across block sizes;
 - records independent of chunk size and block size.
 
-**GPU results:** run the Colab notebook. It produces
-`docs/figures/compare_*.png`, `compare_history_agreement.png` and a table for
-this section.
+### Results on the GTX 1660 Ti (default build: FMA on, platform math)
+
+2·10⁶ photons per setup:
+
+| setup | same discrete history | bitwise-identical records | largest \|Δpos\| when discrete history agrees | efficiency z (independent seeds) | arrival-time χ² p / KS p | hit-map χ² p |
+|---|---|---|---|---|---|---|
+| black walls (solid angle) | 100% | 35.7% | 2·10⁻⁵ mm | −1.22 | 0.61 / 0.20 | 0.37 |
+| black walls + absorption | 100% | 32.3% | 2·10⁻⁵ mm | −1.03 | 0.010 / 0.044 | 0.33 |
+| polished cube (default) | 100% | 39.9% | 1·10⁻³ mm | −1.97 | 0.31 / 0.50 | 0.11 |
+| Lambertian wrap, volume source | 99.99985% (3 photons) | 12.2% | 4.9 mm | +1.89 | 0.74 / 0.89 | 0.87 |
+| Lambertian, **portable math + no FMA** | **100%** | **100%** | 0 | +1.88 | 0.74 / 0.89 | 0.88 |
+
+![history agreement](docs/figures/compare_history_agreement.png)
+![compare polished](docs/figures/compare_polished.png)
+
+Reading the table:
+
+* **Same seed: the GPU reproduces the CPU's histories.** In 8·10⁶ photons
+  from the default builds, only 3 histories (all with Lambertian walls) took
+  a different discrete path. Yet only 12–40% of records are bitwise
+  identical: last-bit differences are everywhere, and they almost never
+  matter.
+* **Lambertian walls amplify differences.** With identical discrete
+  histories, end points can still differ by millimetres. A diffuse
+  reflection maps a tiny difference in the incoming state onto a visibly
+  different outgoing direction, and the difference then grows along the
+  path.
+* **Independent seeds: all statistical tests pass,** with one low p-value.
+  The absorption setup's arrival-time χ² gives p = 0.010.
+  - I checked whether that is a GPU effect. The CPU **alone**, with the same
+    two seeds (12345 vs 12346), gives exactly the same p = 0.010.
+  - Six other independent CPU seed pairs give p between 0.10 and 0.91.
+  - With about 20 p-values in this table, one near 0.01 is a normal
+    fluctuation, so I report it rather than change the seed.
+* **Bitwise identical with portable math and no FMA.** All 2·10⁶ records
+  are identical to the last bit. The same holds between the GPU and the
+  **MinGW-GCC** CPU build: different host compiler, different OS runtime,
+  different device. The GPU test asserts this in that configuration
+  (`gpu_tests` passes).
 
 ### Where and why histories diverge
 
@@ -442,10 +500,15 @@ This is the same mechanism expected between CPU and GPU. Reproduce it with
 **Making them identical.** With `-DOPTPHOT_PORTABLE_MATH=ON
 -DOPTPHOT_CUDA_FMAD=OFF`, the four transcendental functions come from
 `pmath.hpp`, built only from correctly rounded operations, and nothing is
-fused. Every operation is then exactly specified by IEEE-754, so CPU and GPU
-histories *should* agree to the last bit. In that configuration the GPU test
-**asserts** that all 10⁶ records are bitwise identical. The notebook builds
-and runs this variant; its result is the definitive check.
+fused. Every operation is then exactly specified by IEEE-754, and CPU and GPU
+histories **do** agree to the last bit, as measured above.
+
+The price was measured at 10⁸ photons, tally mode, median of 5 runs:
+- default cube: 107 → 118 ms, i.e. +10%;
+- Lambertian setup: 306 → 331 ms, i.e. +8%.
+
+Bit-reproducibility is therefore cheap enough to keep as a validation and
+debugging mode, but it is not the default.
 
 <a id="benchmarks"></a>
 ## 7. Benchmarks and profiling
@@ -457,26 +520,72 @@ times separately.
   device from (seed, id), and the parameters travel as kernel arguments.
 - In a Geant4 integration the "gensteps" would have to be uploaded instead.
 
-**CPU** (AMD Ryzen 7 4800H, 8 cores / 16 threads, MinGW-w64 GCC 13 `-O3`,
-default polished cube, median of 3 runs;
-data in [`docs/data`](docs/data)):
+**Setup.** All numbers were measured on one laptop:
+- **CPU:** AMD Ryzen 7 4800H, 8 cores / 16 threads, MinGW-w64 GCC 13 `-O3`.
+- **GPU:** GTX 1660 Ti (laptop, sm_75, 24 SMs), nvcc 12.2.
+- Each value is the median of 5 runs. The raw data are in
+  [`docs/data`](docs/data).
 
-| backend | 10⁴ | 10⁵ | 10⁶ | 10⁷ | 10⁸ photons |
+Throughput in photons/s, transport only:
+
+| default cube (polished, centre source) | 10⁴ | 10⁵ | 10⁶ | 10⁷ | 10⁸ photons |
 |---|---|---|---|---|---|
-| 1 thread, tally | 3.9·10⁶ /s | 3.8·10⁶ | 3.8·10⁶ | 3.5·10⁶ | – |
-| 16 threads (OpenMP), tally | 6.4·10⁶ | 3.3·10⁷ | 3.9·10⁷ | 3.9·10⁷ | 3.6·10⁷ |
-| 16 threads (OpenMP), records | 5.6·10⁶ | 3.1·10⁷ | 3.4·10⁷ | 3.5·10⁷ | – |
+| CPU, 1 thread | 3.7·10⁶ | 3.3·10⁶ | 3.5·10⁶ | 3.5·10⁶ | – |
+| CPU, 16 threads (OpenMP) | 6.7·10⁶ | 2.9·10⁷ | 3.0·10⁷ | 3.1·10⁷ | 3.1·10⁷ |
+| **GPU, tally** | 1.6·10⁸ | 4.2·10⁸ | 8.4·10⁸ | 9.0·10⁸ | **9.3·10⁸** |
+| GPU, records: kernel only | 5.4·10⁷ | 4.2·10⁸ | 7.7·10⁸ | 9.1·10⁸ | – |
+| GPU, records: incl. copy + host buffers | 6.7·10⁶ | 4.0·10⁷ | 6.9·10⁷ | 9.6·10⁷ | – |
 
-![cpu benchmark](docs/figures/benchmark_cpu_local_throughput.png)
+| Lambertian wrap, volume source | 10⁴ | 10⁵ | 10⁶ | 10⁷ | 10⁸ photons |
+|---|---|---|---|---|---|
+| CPU, 1 thread | 1.2·10⁶ | 1.2·10⁶ | 1.3·10⁶ | 1.3·10⁶ | – |
+| CPU, 16 threads (OpenMP) | 2.6·10⁶ | 1.0·10⁷ | 1.1·10⁷ | 1.1·10⁷ | 1.0·10⁷ |
+| **GPU, tally** | 1.4·10⁸ | 3.0·10⁸ | 3.3·10⁸ | 3.2·10⁸ | **3.3·10⁸** |
+| GPU, records: kernel only | 8.0·10⁷ | 2.6·10⁸ | 3.6·10⁸ | 3.7·10⁸ | – |
+| GPU, records: incl. copy + host buffers | 1.0·10⁷ | 3.7·10⁷ | 6.2·10⁷ | 7.3·10⁷ | – |
 
-Small runs (10⁴ photons) do not parallelise: with chunks of 4096 photons
-there are only three chunks. OpenMP scales by about 10× on 8 physical cores
-with SMT.
+![benchmark default](docs/figures/benchmark_default_throughput.png)
+![gpu breakdown](docs/figures/benchmark_default_gpu_breakdown.png)
 
-**GPU:** the notebook produces `docs/figures/benchmark_colab_*_throughput.png`
-and `*_gpu_breakdown.png` (where the time goes in records mode). Colab VMs
-have only 2 vCPUs, so the CPU numbers there are not a fair baseline; compare
-GPU numbers against the table above.
+What the numbers say:
+
+* **Speed-up.** At 10⁸ photons, the GPU tally is **≈ 30×** faster than all
+  16 CPU threads and **≈ 260×** faster than one CPU thread. This holds in
+  both setups.
+  - The Lambertian setup is about 3× slower per photon on both devices,
+    because its histories are about twice as long.
+  - That setup's GPU throughput is also limited by the divergence discussed
+    below.
+* **The GPU needs work to be efficient.** Throughput keeps rising until
+  roughly 10⁶ photons per launch fill the 24 SMs. At 10⁴ photons a launch
+  is dominated by fixed overheads.
+* **Records mode is a transfer and host-memory benchmark, not a transport
+  benchmark.** At 10⁷ photons the default-cube kernel takes 11 ms, but the
+  run takes 104 ms:
+  - 47 ms device→host copy of 290 MB into pageable memory;
+  - about 40 ms of *host-side* work, which is mainly `std::vector::resize`
+    zero-filling the output buffers and the page faults of first touch.
+
+  Both costs disappear in tally mode, which leaves kilobytes on the device.
+  The obvious next steps are pinned buffers allocated once, plus streams to
+  overlap chunks.
+* **The tally kernel costs something.** Its kernel time is 0–15% higher than
+  the records kernel at 10⁷ photons, through shared-memory atomic
+  contention and a 10 kB shared histogram per block. It is still 4–9×
+  faster end to end. This has not been profiled in detail (see
+  [`docs/PROFILING.md`](docs/PROFILING.md)); warp-aggregated atomics are the
+  standard fix.
+* **The CPU compiler matters.** The same CPU code built with MSVC
+  (`/O2 /fp:precise`) runs 20–30% slower than with GCC. The speed-ups
+  above use the faster GCC build.
+* **Benchmarking a laptop GPU needs care.**
+  - A first version warmed the GPU up only at program start. The GPU then
+    dropped to idle clocks during the minutes of CPU benchmarks, and the
+    first GPU measurements came out up to about 9× too slow.
+  - `optphot_bench` now runs about 0.5 s of warm-up immediately before the
+    GPU measurements.
+  - Run-to-run variation of the CPU numbers on this laptop is about ±20%
+    (thermal state).
 
 ### Divergence: what limits a history-based kernel
 
@@ -511,18 +620,19 @@ threads per warp directly.
 - **Physics** — see the simplifications in §2. In particular: no
   polarisation, no wavelength dependence, no surface roughness, a single
   box, ideal detection.
-- **The GPU code has not been run on this development machine.** Its
-  correctness rests on:
-  - the shared physics code, which is fully validated on the CPU;
-  - the `cuda-compile` CI job;
-  - the GPU tests and comparison run in the Colab notebook.
+- **One GPU.** The CUDA code has been run on a single GPU model (GTX 1660 Ti,
+  sm_75, CUDA 12.2, Windows). The Colab notebook (T4, Linux) and other
+  architectures have not been run yet.
+- **No Nsight profile yet.** The conda-forge toolchain used here does not
+  include Nsight Systems or Nsight Compute. The divergence numbers are a
+  model estimate (§7), not a hardware measurement.
 - **GPU v1 is deliberately simple.** It is history-based with one thread per
   photon. It uses no pinned memory, no streams and no overlap of transfers
   with compute, and the 32-bit shared tallies assume fewer than 2³²
   photons per block.
-- **Benchmarks.** The CPU and GPU numbers come from different machines. The
-  divergence estimate assumes equal cost per step. Absolute GPU throughput
-  depends strongly on the GPU model.
+- **Benchmarks.** These are a laptop CPU and a laptop GPU, with thermal and
+  clock variability. The divergence estimate assumes equal cost per step.
+  Absolute GPU throughput depends strongly on the GPU model.
 - **The `max_steps` limit** is a safety net. With perfect mirrors and
   n_det < n_scint, TIR-trapped photons hit it by construction; it is
   reported as a separate fate.

@@ -280,11 +280,17 @@ The consequence:
 `OPTPHOT_PORTABLE_MATH` (`pmath.hpp`) replaces the four transcendental
 functions with versions built only from correctly rounded operations. With
 FMA contraction also disabled, every operation is then exactly specified by
-IEEE-754, and the CPU and GPU *should* agree to the last bit. The GPU test
-asserts this in that configuration.
+IEEE-754, and the CPU and GPU **do** agree to the last bit. On a GTX 1660 Ti,
+all 2·10⁶ records of a Lambertian + Rayleigh setup were identical, including
+against a CPU build from a different compiler (GCC vs MSVC). The GPU test
+asserts this in that configuration. The price was about 8–10% of GPU kernel
+time.
 
-A CPU-only illustration (library math vs portable math, same seed, 10⁶
-photons): 100% of histories take identical discrete paths, but only 23% of
+Measured with the default build (FMA on, platform math), CPU vs GPU with the
+same seed: 3 of 8·10⁶ histories took a different discrete path, but only
+12–40% of records were bitwise identical. The same effect is visible on the
+CPU alone (library math vs portable math, same seed, 10⁶ photons): 100% of
+histories take identical discrete paths, but only 23% of
 records are bitwise identical.
 
 **Single vs double precision.** Consumer and cloud GPUs (GTX/RTX, T4) run
