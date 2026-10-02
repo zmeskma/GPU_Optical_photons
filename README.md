@@ -1,4 +1,8 @@
-# gpu-optical-photon-toy
+# GPU_Optical_photons
+
+[![CI](https://github.com/zmeskma/GPU_Optical_photons/actions/workflows/ci.yml/badge.svg)](https://github.com/zmeskma/GPU_Optical_photons/actions/workflows/ci.yml)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/zmeskma/GPU_Optical_photons/blob/main/notebooks/run_on_colab.ipynb)
+
 
 A small, self-contained **optical-photon transport code for a scintillator
 box**: a CPU reference implementation and a CUDA implementation that share
