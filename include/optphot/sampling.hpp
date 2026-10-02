@@ -15,15 +15,16 @@ namespace optphot {
 // Distance to the next interaction for a process with mean free path
 // `length`; kInfinity means "process disabled".
 OPT_HD OPT_INLINE float sample_exponential(float length, float u) {
-  return is_inf(length) ? kInfinity : -length * logf(u);
+  return is_inf(length) ? kInfinity : -length * opt_log(u);
 }
 
 // Isotropic unit vector: cos(theta) uniform in [-1, 1], phi uniform.
 OPT_HD OPT_INLINE Vec3 sample_isotropic(float u1, float u2) {
   const float cos_t = 2.0f * u1 - 1.0f;
   const float sin_t = sqrtf(fmaxf(0.0f, 1.0f - cos_t * cos_t));
-  const float phi = kTwoPi * u2;
-  return {sin_t * cosf(phi), sin_t * sinf(phi), cos_t};
+  float sin_phi, cos_phi;
+  opt_sincos_turns(u2, sin_phi, cos_phi);
+  return {sin_t * cos_phi, sin_t * sin_phi, cos_t};
 }
 
 // Cosine of the scattering angle for unpolarised Rayleigh scattering,
@@ -38,24 +39,24 @@ OPT_HD OPT_INLINE Vec3 sample_isotropic(float u1, float u2) {
 OPT_HD OPT_INLINE float sample_rayleigh_cos(float u) {
   const float q = 4.0f * u - 2.0f;
   const float s = sqrtf(q * q + 1.0f);
-  const float a = (q >= 0.0f) ? cbrtf(q + s) : 1.0f / cbrtf(s - q);
+  const float a = (q >= 0.0f) ? opt_cbrt(q + s) : 1.0f / opt_cbrt(s - q);
   return fminf(1.0f, fmaxf(-1.0f, a - 1.0f / a));
 }
 
 // New direction after Rayleigh scattering of a photon travelling along `dir`.
 OPT_HD OPT_INLINE Vec3 sample_rayleigh_direction(Vec3 dir, float u1, float u2) {
-  return rotate_about(dir, sample_rayleigh_cos(u1), kTwoPi * u2);
+  return rotate_about(dir, sample_rayleigh_cos(u1), u2);
 }
 
 // Lambertian (cosine-weighted) direction in the hemisphere around the unit
 // vector `normal`: p(cos t) d(cos t) = 2 cos t d(cos t), i.e. cos t = sqrt(u).
 OPT_HD OPT_INLINE Vec3 sample_lambertian(Vec3 normal, float u1, float u2) {
-  return rotate_about(normal, sqrtf(u1), kTwoPi * u2);
+  return rotate_about(normal, sqrtf(u1), u2);
 }
 
 // Emission time from a single-exponential decay with time constant tau (ns).
 OPT_HD OPT_INLINE float sample_emission_time(float tau, float u) {
-  return tau > 0.0f ? -tau * logf(u) : 0.0f;
+  return tau > 0.0f ? -tau * opt_log(u) : 0.0f;
 }
 
 // Uniform point in the box [-hx,hx] x [-hy,hy] x [-hz,hz].

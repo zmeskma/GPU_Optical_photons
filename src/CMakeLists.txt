@@ -1,5 +1,6 @@
 # Host library: configuration, output and the CPU reference backend.
 add_library(optphot_core STATIC
+  core/compare.cpp
   core/config.cpp
   core/io.cpp
   cpu/cpu_backend.cpp)
@@ -29,6 +30,7 @@ if(WITH_CUDA)
   target_compile_options(optphot_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
   if(NOT OPTPHOT_CUDA_FMAD)
     target_compile_options(optphot_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--fmad=false>)
+    target_compile_definitions(optphot_gpu PUBLIC OPTPHOT_NO_FMAD)
   endif()
   target_link_libraries(optphot INTERFACE optphot_gpu)
 endif()

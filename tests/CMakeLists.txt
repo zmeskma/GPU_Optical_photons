@@ -13,7 +13,8 @@ add_executable(unit_tests
   test_rng.cpp
   test_fresnel.cpp
   test_sampling.cpp
-  test_geometry.cpp)
+  test_geometry.cpp
+  test_pmath.cpp)
 target_link_libraries(unit_tests PRIVATE optphot_physics optphot_warnings Catch2::Catch2WithMain)
 catch_discover_tests(unit_tests TEST_PREFIX "unit:")
 
@@ -25,3 +26,11 @@ catch_discover_tests(config_tests TEST_PREFIX "config:")
 add_executable(validation_tests test_transport_cpu.cpp)
 target_link_libraries(validation_tests PRIVATE optphot optphot_warnings Catch2::Catch2WithMain)
 catch_discover_tests(validation_tests TEST_PREFIX "validation:")
+
+if(WITH_CUDA)
+  # GPU backend: analytic checks, CPU/GPU agreement, tally reproducibility.
+  # Skipped at run time when no CUDA device is present.
+  add_executable(gpu_tests test_gpu.cpp)
+  target_link_libraries(gpu_tests PRIVATE optphot optphot_warnings Catch2::Catch2WithMain)
+  catch_discover_tests(gpu_tests TEST_PREFIX "gpu:" DISCOVERY_MODE PRE_TEST)
+endif()

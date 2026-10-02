@@ -62,7 +62,7 @@ OPT_HD OPT_INLINE U32x4 philox_round(U32x4 c, U32x2 k) {
 
 // One Philox4x32 block with 10 rounds: 128 random bits from (counter, key).
 OPT_HD OPT_INLINE U32x4 philox4x32_10(U32x4 ctr, U32x2 key) {
-#if defined(__CUDACC__)
+#if OPT_DEVICE_PASS
 #pragma unroll
 #endif
   for (int r = 0; r < 10; ++r) {

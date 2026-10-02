@@ -8,6 +8,7 @@
 #pragma once
 
 #include "optphot/hd.hpp"
+#include "optphot/pmath.hpp"
 
 namespace optphot {
 
@@ -39,13 +40,15 @@ OPT_HD OPT_INLINE void orthonormal_basis(Vec3 n, Vec3& t1, Vec3& t2) {
   t2 = {b, sign + n.y * n.y * a, -n.y};
 }
 
-// Returns the unit vector with polar cosine `cos_theta` and azimuth `phi`
-// measured around the unit vector `axis`.
-OPT_HD OPT_INLINE Vec3 rotate_about(Vec3 axis, float cos_theta, float phi) {
+// Returns the unit vector with polar cosine `cos_theta` and azimuth
+// 2 pi * `phi_turns` measured around the unit vector `axis`.
+OPT_HD OPT_INLINE Vec3 rotate_about(Vec3 axis, float cos_theta, float phi_turns) {
   Vec3 t1, t2;
   orthonormal_basis(axis, t1, t2);
   const float sin_theta = sqrtf(fmaxf(0.0f, 1.0f - cos_theta * cos_theta));
-  const Vec3 d = (sin_theta * cosf(phi)) * t1 + (sin_theta * sinf(phi)) * t2 + cos_theta * axis;
+  float sin_phi, cos_phi;
+  opt_sincos_turns(phi_turns, sin_phi, cos_phi);
+  const Vec3 d = (sin_theta * cos_phi) * t1 + (sin_theta * sin_phi) * t2 + cos_theta * axis;
   return normalize(d);
 }
 

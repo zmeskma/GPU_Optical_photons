@@ -15,6 +15,7 @@
 
 #include "optphot/analytic.hpp"
 #include "optphot/backend.hpp"
+#include "optphot/compare.hpp"
 #include "optphot/stats.hpp"
 
 using namespace optphot;
@@ -336,4 +337,41 @@ TEST_CASE("CPU results do not depend on the number of threads", "[determinism]")
   uint64_t hist_total = 0;
   for (uint64_t v : tally.time_hist) hist_total += v;
   CHECK(hist_total == c[0]);
+}
+
+TEST_CASE("Comparison tools: identical runs and independent seeds", "[compare]") {
+  SimParams p;
+  p.scat_length = 300.0f;
+  const uint64_t n = 300000;
+  PhotonRecords a, b, c;
+  run_cpu_records(p, n, a, kAllThreads);
+  run_cpu_records(p, n, b, 1);
+  SimParams pc = p;
+  pc.seed = p.seed + 1;
+  run_cpu_records(pc, n, c, kAllThreads);
+
+  const HistoryAgreement same = compare_histories(a, b);
+  CHECK(same.bitwise_identical == n);
+  CHECK(same.first_divergent == -1);
+
+  // Different seeds: histories are unrelated, distributions are compatible.
+  const HistoryAgreement diff = compare_histories(a, c);
+  CHECK(diff.same_discrete < n);
+  const DistributionComparison d = compare_distributions(a, c, p);
+  REPORT("independent seeds: eff z " << d.eff_z << ", time chi2 p " << d.time_chi2.pvalue
+                                     << ", KS p " << d.time_ks.pvalue << ", xy chi2 p "
+                                     << d.xy_chi2.pvalue);
+  CHECK(std::fabs(d.eff_z) < 4.0);
+  CHECK(d.time_chi2.pvalue > 1e-4);
+  CHECK(d.time_ks.pvalue > 1e-4);
+  CHECK(d.xy_chi2.pvalue > 1e-4);
+
+  // A real difference must be detected: change the readout index.
+  SimParams pd = pc;
+  pd.n_det = 1.5f;
+  PhotonRecords e;
+  run_cpu_records(pd, n, e, kAllThreads);
+  const DistributionComparison bad = compare_distributions(a, e, p);
+  REPORT("n_det 1.63 vs 1.5: eff z " << bad.eff_z << ", xy chi2 p " << bad.xy_chi2.pvalue);
+  CHECK(std::fabs(bad.eff_z) > 5.0);
 }

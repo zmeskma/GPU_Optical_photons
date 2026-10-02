@@ -10,6 +10,9 @@ option(OPTPHOT_BUILD_TESTS "Build unit and validation tests" ON)
 option(OPTPHOT_CUDA_FMAD
        "Let nvcc contract a*b+c into fused multiply-add (nvcc's default). Turn OFF to study CPU/GPU bitwise agreement."
        ON)
+option(OPTPHOT_PORTABLE_MATH
+       "Use the portable log/sincos/cbrt of pmath.hpp (built from correctly rounded ops only) instead of the platform math library. With OPTPHOT_CUDA_FMAD=OFF this makes CPU and GPU histories bitwise identical."
+       OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -57,6 +60,10 @@ endif()
 add_library(optphot_physics INTERFACE)
 target_include_directories(optphot_physics INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(optphot_physics INTERFACE cxx_std_17)
+if(OPTPHOT_PORTABLE_MATH)
+  target_compile_definitions(optphot_physics INTERFACE OPTPHOT_PORTABLE_MATH)
+endif()
+message(STATUS "optphot: portable math = ${OPTPHOT_PORTABLE_MATH}")
 
 add_subdirectory(src)
 add_subdirectory(apps)
