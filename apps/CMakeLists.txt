@@ -6,3 +6,6 @@ if(WITH_CUDA)
   add_executable(optphot_compare optphot_compare.cpp)
   target_link_libraries(optphot_compare PRIVATE optphot optphot_warnings)
 endif()
+
+add_executable(optphot_bench optphot_bench.cpp)
+target_link_libraries(optphot_bench PRIVATE optphot optphot_warnings)
