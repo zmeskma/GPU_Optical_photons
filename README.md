@@ -228,8 +228,8 @@ ctest --test-dir build-gpu --output-on-failure
 [`scripts/build_windows_cuda.bat`](scripts/build_windows_cuda.bat) uses
 conda-forge's CUDA 12.2 compiler packages, installed in a user folder with
 the standalone `micromamba` (no admin rights), plus Visual Studio's MSVC.
-The commands are in the script header. Run the executables with that
-environment's `Library\bin` on `PATH`, so that `cudart64_12.dll` is found.
+The commands are in the script header. The CUDA runtime is linked
+statically, so the built executables need no CUDA DLL at run time.
 
 No GPU at hand? Open [`notebooks/run_on_colab.ipynb`](notebooks/run_on_colab.ipynb)
 in Google Colab with a GPU runtime. It builds everything with CUDA and runs
