@@ -143,13 +143,15 @@ include/optphot/        header-only physics, __host__ __device__ (OPT_HD)
   philox.hpp            Philox4x32-10 counter-based RNG, per-photon stream
   pmath.hpp             log / sincos / cbrt: platform library or portable versions
   vec3.hpp sampling.hpp fresnel.hpp geometry.hpp
-  transport.hpp         transport_photon(): the complete history of one photon
+  transport.hpp         transport_photon() = start_photon() + step_photon() loop
   backend.hpp           host API of both backends (records & tally modes)
   analytic.hpp stats.hpp compare.hpp   validation helpers (host only)
 src/cpu/cpu_backend.cpp CPU loop (+ OpenMP)
 src/gpu/gpu_backend.cu  CUDA kernels (records, tally) — built only with WITH_CUDA=ON
+src/gpu/gpu_event.cu    event-based records kernel with compaction (GPU v2)
 src/core/               config parsing, .npy output, comparison tools
-apps/                   optphot (CLI), optphot_compare (CPU vs GPU), optphot_bench
+apps/                   optphot (CLI), optphot_compare (CPU vs GPU), optphot_bench,
+                        optphot_event_bench (history- vs event-based GPU)
 tests/                  Catch2 unit, validation, config and GPU tests (ctest)
 python/                 analysis, validation scans, plots
 notebooks/              Colab notebook (CUDA build, GPU tests, figures)
@@ -271,6 +273,11 @@ python python/plot_benchmarks.py bench.csv
 
 ```bash
 python python/divergence_estimate.py --exe build/apps/optphot     # SIMT efficiency estimate
+```
+
+```bash
+./build-gpu/apps/optphot_event_bench --config configs/default.cfg --n_photons 1e7 --csv runs/event_default.csv
+python python/plot_event_based.py --exe build-gpu/apps/optphot --event_dir runs --outdir runs
 ```
 
 <a id="validation"></a>
@@ -609,10 +616,76 @@ because the survivors' history lengths are still heavy-tailed. This is the
 quantitative case for **event-based tracking**. Keep the photon state in
 global memory (structure-of-arrays), advance all alive photons by a few
 steps per launch, compact them, and refill. The cost is state traffic and
-compaction overhead, so the right *k* must be measured.
+compaction overhead, so the right *k* must be measured (next section).
 [`docs/PROFILING.md`](docs/PROFILING.md) covers this together with the Nsight
 Systems and Nsight Compute recipes, including the metric that measures active
 threads per warp directly.
+
+### Event-based tracking: prediction vs measurement
+
+GPU v2 ([`gpu_event.cu`](src/gpu/gpu_event.cu)) implements this, without
+refill:
+- Each launch advances every alive photon by up to *k* steps, using the same
+  `start_photon` / `step_photon` as the history-based kernels
+  ([`transport.hpp`](include/optphot/transport.hpp)).
+- Finished photons write their record at their photon index. Survivors are
+  packed into a second state buffer (48 bytes per photon, structure of
+  arrays), with one warp-aggregated `atomicAdd` per warp. The host relaunches
+  until no photon is left.
+- The RNG state is a single integer, `PhiloxStream::draws()`: a counter-based
+  generator resumes from the number of values consumed.
+- Every event-based run reproduces the history-based records **bit for bit**.
+  The tests cover several *k*, chunking and the `max_steps` limit.
+- The kernel counts useful and issued lane-steps on the GPU, so the SIMT
+  efficiency is measured, not modelled.
+
+[`apps/optphot_event_bench`](apps/optphot_event_bench.cpp) measures records-mode
+transport time, including the gaps between launches. GTX 1660 Ti, 10⁷ photons,
+median of 3 ([raw data](docs/data)):
+
+| k (steps per launch) | polished: SIMT eff. model = GPU | predicted | **measured** | Lambertian: SIMT eff. model = GPU | predicted | **measured** |
+|---|---|---|---|---|---|---|
+| history-based | 16.2% | – | 9.0·10⁸ /s | 27.1% | – | 3.7·10⁸ /s |
+| 1 | 100% | 5.6·10⁹ | 2.8·10⁸ (0.31×) | 100% | 1.4·10⁹ | 2.2·10⁸ (0.58×) |
+| 2 | 74.2% | 4.1·10⁹ | 4.8·10⁸ (0.53×) | 89.4% | 1.2·10⁹ | 3.4·10⁸ (0.92×) |
+| 4 | 49.1% | 2.7·10⁹ | 7.9·10⁸ (0.87×) | 72.3% | 1.0·10⁹ | **4.7·10⁸ (1.27×)** |
+| 8 | 30.3% | 1.7·10⁹ | **9.9·10⁸ (1.10×)** | 49.8% | 6.9·10⁸ | 4.5·10⁸ (1.21×) |
+| 16 | 21.5% | 1.2·10⁹ | 8.9·10⁸ (0.99×) | 31.1% | 4.3·10⁸ | 3.6·10⁸ (0.95×) |
+| 32 | 17.8% | 9.9·10⁸ | 8.3·10⁸ (0.92×) | 27.1% | 3.7·10⁸ | 3.3·10⁸ (0.88×) |
+
+"Predicted" = history-based throughput × efficiency(*k*) / efficiency(history).
+This is the model's upper bound: it treats compaction as free.
+
+![event-based tracking](docs/figures/event_based.png)
+
+What the numbers say:
+
+* **The lane model is exact.** The lane-steps counted on the GPU agree with
+  `divergence_estimate.py` to 0.1% for every *k*.
+* **The speed does not follow it.** The best gains are 1.10× (polished cube,
+  k = 8) and 1.27× (Lambertian, k = 4). The model predicts 1.9× and 2.7× at
+  those *k*. At k = 1, event-based tracking is 3.2× and 1.7× *slower* instead
+  of 6× and 3.7× faster. The model ignores three costs:
+  1. **The tail cannot fill the GPU.** Compaction fills warps, not the GPU.
+     The event kernel keeps 24 SMs × 768 threads = 18,432 photons resident.
+     In the polished cube at k = 1, 247 of the 284 launches have fewer alive
+     photons than that, so they run one step on a mostly idle GPU. The
+     longest history (284 steps) is a serial critical path in both designs.
+     Event-based tracking pays for it as 284 launches.
+  2. **Launch round trips.** Each launch costs a memset, the launch itself,
+     and a 4-byte copy of the survivor count back to the host. Together that
+     is about 50 µs per launch here (Windows/WDDM), or 14 ms of the 36 ms
+     at k = 1.
+  3. **Bookkeeping in the kernel.** That means 96 bytes of state traffic per
+     photon per launch, regenerating one Philox block on resume, and the
+     compaction itself. Even at k = 10,000 (a single launch, nothing to
+     compact), the event kernel is 10–16% slower than the history-based
+     records kernel: 69 instead of 46 registers means fewer resident warps.
+* **What would close the gap** is a continuous supply of photons. Refilling
+  freed slots (from a queue of gensteps, §9) keeps the launches full. Keeping
+  the stepping loop on the device, with a persistent kernel or CUDA graphs,
+  removes the round trips. For a fixed batch like this one, moderate *k*
+  (4–8) gives a modest but real gain.
 
 <a id="limitations"></a>
 ## 8. Known limitations
@@ -624,8 +697,9 @@ threads per warp directly.
   sm_75, CUDA 12.2, Windows). The Colab notebook (T4, Linux) and other
   architectures have not been run yet.
 - **No Nsight profile yet.** The conda-forge toolchain used here does not
-  include Nsight Systems or Nsight Compute. The divergence numbers are a
-  model estimate (§7), not a hardware measurement.
+  include Nsight Systems or Nsight Compute. The SIMT efficiencies in §7 are
+  counted by the event-based kernel itself (useful vs issued lane-steps), not
+  by a profiler.
 - **GPU v1 is deliberately simple.** It is history-based with one thread per
   photon. It uses no pinned memory, no streams and no overlap of transfers
   with compute, and the 32-bit shared tallies assume fewer than 2³²
@@ -640,9 +714,10 @@ threads per warp directly.
 <a id="next-steps"></a>
 ## 9. Next steps
 
-1. **Event-based tracking**: SoA photon state in global memory,
-   per-interaction kernels, periodic compaction and refill, compared against
-   the history-based kernel in the same framework (§7).
+1. **Event-based tracking, continued**: GPU v2 (§7) compacts but does not
+   refill, and the host drives every launch. Next: refill freed slots from a
+   photon queue, a device-side stepping loop (persistent kernel or CUDA
+   graphs), and per-interaction kernels with sorting by event type.
 2. **Wavelength dependence**: sample photon energies from an emission
    spectrum, use tabulated n(λ), absorption and Rayleigh lengths, and group
    velocity from dn/dλ.

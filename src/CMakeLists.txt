@@ -24,6 +24,8 @@ target_link_libraries(optphot INTERFACE optphot_core)
 if(WITH_CUDA)
   find_package(CUDAToolkit REQUIRED)
   add_library(optphot_gpu STATIC gpu/gpu_backend.cu)
+  # Event-based transport (GPU v2, src/gpu/gpu_event.cu).
+  target_sources(optphot_gpu PRIVATE gpu/gpu_event.cu)
   # Static CUDA runtime: executables do not need cudart64_12.dll / libcudart.so
   # at run time (otherwise a missing DLL makes ctest silently drop the GPU tests).
   target_link_libraries(optphot_gpu PUBLIC optphot_physics CUDA::cudart_static)

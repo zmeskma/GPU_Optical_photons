@@ -40,10 +40,19 @@ struct PhotonResult {
 // for total internal reflection, where R is exactly 1.
 OPT_HD OPT_INLINE bool happens(float u, float prob) { return u <= prob; }
 
-OPT_HD inline PhotonResult transport_photon(const SimParams& p, uint64_t photon_id) {
-  PhiloxStream rng(p.seed, photon_id);
+// State of a photon in flight. The history-based kernels keep it in registers
+// for the photon's whole life; the event-based kernel (src/gpu/gpu_event.cu)
+// stores it in global memory between launches. Every completed step of an
+// alive photon is either a scattering or a boundary reflection, so the number
+// of steps done so far is n_boundary + n_scatter and needs no extra field.
+struct PhotonState {
+  Vec3 pos, dir;
+  float t, path;
+  uint32_t n_boundary, n_scatter;
+};
 
-  // --- Emission --------------------------------------------------------------
+// Emission: position, direction and emission time.
+OPT_HD OPT_INLINE PhotonState start_photon(const SimParams& p, PhiloxStream& rng) {
   Vec3 pos;
   if (p.source == SourceType::Point) {
     pos = {p.src_x, p.src_y, p.src_z};
@@ -52,90 +61,101 @@ OPT_HD inline PhotonResult transport_photon(const SimParams& p, uint64_t photon_
     pos = sample_in_box(p.hx, p.hy, p.hz, u1, u2, u3);
   }
   const float ua = rng.uniform(), ub = rng.uniform();
-  Vec3 dir = sample_isotropic(ua, ub);
-  float t = sample_emission_time(p.tau, rng.uniform());
+  const Vec3 dir = sample_isotropic(ua, ub);
+  const float t = sample_emission_time(p.tau, rng.uniform());
+  return {pos, dir, t, 0.0f, 0u, 0u};
+}
 
+// One step of the transport loop. Returns true if the photon is still alive;
+// otherwise sets `fate` and leaves s at the final interaction.
+OPT_HD OPT_INLINE bool step_photon(const SimParams& p, PhiloxStream& rng, PhotonState& s,
+                                   Fate& fate) {
   // Monochromatic and non-dispersive: phase and group velocity are both c/n.
   const float inv_speed = p.n_scint / kSpeedOfLight;  // ns / mm
 
-  PhotonResult r{Fate::MaxSteps, 0u, 0u, t, pos, 0.0f};
-  float path = 0.0f;
+  const float s_abs = sample_exponential(p.abs_length, rng.uniform());
+  const float s_sca = sample_exponential(p.scat_length, rng.uniform());
+  const BoxHit hit = distance_to_box_exit(s.pos, s.dir, p.hx, p.hy, p.hz);
 
-  for (uint32_t step = 0; step < p.max_steps; ++step) {
-    const float s_abs = sample_exponential(p.abs_length, rng.uniform());
-    const float s_sca = sample_exponential(p.scat_length, rng.uniform());
-    const BoxHit hit = distance_to_box_exit(pos, dir, p.hx, p.hy, p.hz);
-
-    // --- Bulk absorption -----------------------------------------------------
-    if (s_abs < hit.dist && s_abs <= s_sca) {
-      pos = pos + s_abs * dir;
-      t += s_abs * inv_speed;
-      path += s_abs;
-      r.fate = Fate::AbsorbedBulk;
-      break;
-    }
-
-    // --- Rayleigh scattering -------------------------------------------------
-    if (s_sca < hit.dist) {
-      pos = pos + s_sca * dir;
-      t += s_sca * inv_speed;
-      path += s_sca;
-      const float u1 = rng.uniform(), u2 = rng.uniform();
-      dir = sample_rayleigh_direction(dir, u1, u2);
-      ++r.n_scatter;
-      continue;
-    }
-
-    // --- Boundary --------------------------------------------------------------
-    pos = snap_to_face(pos + hit.dist * dir, hit.face, p.hx, p.hy, p.hz);
-    t += hit.dist * inv_speed;
-    path += hit.dist;
-    ++r.n_boundary;
-    const Vec3 normal = face_normal(hit.face);  // outward
-    const float cos_i = dot(dir, normal);       // > 0
-
-    if (hit.face == kReadoutFace) {
-      // Smooth optical interface to the photodetector side: transmitted
-      // photons are detected, Fresnel-reflected ones continue.
-      const FresnelResult f = fresnel_unpolarized(p.n_scint, p.n_det, cos_i);
-      if (happens(rng.uniform(), f.reflectance)) {
-        dir = reflect(dir, normal);
-        continue;
-      }
-      r.fate = Fate::Detected;
-      break;
-    }
-
-    if (p.surface == Surface::Polished) {
-      const FresnelResult f = fresnel_unpolarized(p.n_scint, p.n_out, cos_i);
-      if (happens(rng.uniform(), f.reflectance)) {
-        dir = reflect(dir, normal);
-        continue;
-      }
-      r.fate = Fate::Escaped;  // refracted out; re-entry is not modelled
-      break;
-    }
-    if (p.surface == Surface::Black) {
-      r.fate = Fate::AbsorbedSurface;
-      break;
-    }
-    // Specular or Lambertian reflector painted directly on the surface.
-    if (!happens(rng.uniform(), p.reflectivity)) {
-      r.fate = Fate::AbsorbedSurface;
-      break;
-    }
-    if (p.surface == Surface::Specular) {
-      dir = reflect(dir, normal);
-    } else {
-      const float u1 = rng.uniform(), u2 = rng.uniform();
-      dir = sample_lambertian(-normal, u1, u2);
-    }
+  // --- Bulk absorption -------------------------------------------------------
+  if (s_abs < hit.dist && s_abs <= s_sca) {
+    s.pos = s.pos + s_abs * s.dir;
+    s.t += s_abs * inv_speed;
+    s.path += s_abs;
+    fate = Fate::AbsorbedBulk;
+    return false;
   }
 
-  r.t = t;
-  r.pos = pos;
-  r.path = path;
-  return r;
+  // --- Rayleigh scattering ---------------------------------------------------
+  if (s_sca < hit.dist) {
+    s.pos = s.pos + s_sca * s.dir;
+    s.t += s_sca * inv_speed;
+    s.path += s_sca;
+    const float u1 = rng.uniform(), u2 = rng.uniform();
+    s.dir = sample_rayleigh_direction(s.dir, u1, u2);
+    ++s.n_scatter;
+    return true;
+  }
+
+  // --- Boundary ----------------------------------------------------------------
+  s.pos = snap_to_face(s.pos + hit.dist * s.dir, hit.face, p.hx, p.hy, p.hz);
+  s.t += hit.dist * inv_speed;
+  s.path += hit.dist;
+  ++s.n_boundary;
+  const Vec3 normal = face_normal(hit.face);  // outward
+  const float cos_i = dot(s.dir, normal);     // > 0
+
+  if (hit.face == kReadoutFace) {
+    // Smooth optical interface to the photodetector side: transmitted
+    // photons are detected, Fresnel-reflected ones continue.
+    const FresnelResult f = fresnel_unpolarized(p.n_scint, p.n_det, cos_i);
+    if (happens(rng.uniform(), f.reflectance)) {
+      s.dir = reflect(s.dir, normal);
+      return true;
+    }
+    fate = Fate::Detected;
+    return false;
+  }
+
+  if (p.surface == Surface::Polished) {
+    const FresnelResult f = fresnel_unpolarized(p.n_scint, p.n_out, cos_i);
+    if (happens(rng.uniform(), f.reflectance)) {
+      s.dir = reflect(s.dir, normal);
+      return true;
+    }
+    fate = Fate::Escaped;  // refracted out; re-entry is not modelled
+    return false;
+  }
+  if (p.surface == Surface::Black) {
+    fate = Fate::AbsorbedSurface;
+    return false;
+  }
+  // Specular or Lambertian reflector painted directly on the surface.
+  if (!happens(rng.uniform(), p.reflectivity)) {
+    fate = Fate::AbsorbedSurface;
+    return false;
+  }
+  if (p.surface == Surface::Specular) {
+    s.dir = reflect(s.dir, normal);
+  } else {
+    const float u1 = rng.uniform(), u2 = rng.uniform();
+    s.dir = sample_lambertian(-normal, u1, u2);
+  }
+  return true;
+}
+
+OPT_HD OPT_INLINE PhotonResult finish_photon(const PhotonState& s, Fate fate) {
+  return {fate, s.n_boundary, s.n_scatter, s.t, s.pos, s.path};
+}
+
+OPT_HD inline PhotonResult transport_photon(const SimParams& p, uint64_t photon_id) {
+  PhiloxStream rng(p.seed, photon_id);
+  PhotonState s = start_photon(p, rng);
+  Fate fate = Fate::MaxSteps;
+  for (uint32_t step = 0; step < p.max_steps; ++step) {
+    if (!step_photon(p, rng, s, fate)) break;
+  }
+  return finish_photon(s, fate);
 }
 
 // ---------------------------------------------------------------------------

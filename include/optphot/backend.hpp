@@ -90,4 +90,28 @@ RunTiming run_gpu_records(const SimParams& p, uint64_t n, PhotonRecords& out, in
 RunTiming run_gpu_tally(const SimParams& p, const TallyConfig& c, uint64_t n, Tally& out,
                         int block_size = 256, uint64_t first_id = 0);
 
+// ---- GPU event-based backend (src/gpu/gpu_event.cu) ------------------------
+// Diagnostics of an event-based run.
+struct EventStats {
+  uint64_t launches = 0;           // step-kernel launches (all chunks)
+  uint64_t useful_lane_steps = 0;  // transport steps done = sum of all photons' steps
+  uint64_t issued_lane_steps = 0;  // per warp and launch: 32 x the most steps any lane did
+  double kernels_ms = 0.0;         // sum of the step-kernel durations alone
+  double simt_efficiency() const {
+    return issued_lane_steps ? static_cast<double>(useful_lane_steps) / issued_lane_steps : 0.0;
+  }
+};
+
+// Same records as run_gpu_records (bit for bit), computed event-based: each
+// launch advances every alive photon by up to steps_per_launch steps, then the
+// survivors are compacted so that the next launch runs full warps.
+// RunTiming::kernel_ms is the whole transport loop including the launch and
+// synchronisation gaps between kernels (comparable to run_gpu_records'
+// kernel_ms); EventStats::kernels_ms is the kernels alone.
+// block_size must be a multiple of 32 (warp-level compaction).
+RunTiming run_gpu_records_event(const SimParams& p, uint64_t n, PhotonRecords& out,
+                                uint32_t steps_per_launch, int block_size = 256,
+                                uint64_t first_id = 0, uint64_t chunk = 1ull << 24,
+                                EventStats* stats = nullptr);
+
 }  // namespace optphot

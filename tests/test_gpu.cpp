@@ -7,6 +7,7 @@
 // statistically compatible results for independent seeds.
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
@@ -154,4 +155,58 @@ TEST_CASE("GPU: records do not depend on the chunk size or block size", "[gpu]")
   run_gpu_records(p, n, b, 64, 0, 70001);  // odd chunk size: several partial chunks
   const HistoryAgreement h = compare_histories(a, b);
   CHECK(h.bitwise_identical == n);
+}
+
+TEST_CASE("GPU event-based: records identical to history-based for any k", "[gpu]") {
+  REQUIRE_GPU();
+  SimParams polished;  // default cube: long TIR-trapped histories
+  polished.scat_length = 300.0f;
+  SimParams lambertian;
+  lambertian.surface = Surface::Lambertian;
+  lambertian.reflectivity = 0.95f;
+  lambertian.n_det = 1.5f;
+  lambertian.source = SourceType::UniformVolume;
+  SimParams capped = polished;  // exercises the max_steps limit
+  capped.max_steps = 5;
+  const uint64_t n = 100003;  // not a multiple of the block size
+  for (const SimParams& p : {polished, lambertian, capped}) {
+    PhotonRecords hist;
+    run_gpu_records(p, n, hist);
+    uint64_t steps = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+      steps += hist.n_boundary[i] + hist.n_scatter[i] +
+               (hist.fate[i] == static_cast<uint8_t>(Fate::AbsorbedBulk));
+    }
+    for (const uint32_t k : {1u, 3u, 100000u}) {
+      PhotonRecords ev;
+      EventStats s;
+      run_gpu_records_event(p, n, ev, k, 64, 0, 30011, &s);  // several partial chunks
+      CHECK(compare_histories(hist, ev).bitwise_identical == n);
+      CHECK(s.useful_lane_steps == steps);  // every step counted exactly once
+      CHECK(s.issued_lane_steps >= s.useful_lane_steps);
+    }
+  }
+}
+
+TEST_CASE("GPU event-based: one launch reproduces the history-based SIMT efficiency", "[gpu]") {
+  REQUIRE_GPU();
+  const SimParams p;
+  const uint64_t n = 200000;
+  PhotonRecords hist, ev;
+  run_gpu_records(p, n, hist);
+  EventStats s;
+  run_gpu_records_event(p, n, ev, p.max_steps, 256, 0, n, &s);
+  // With k >= max_steps there is a single launch whose warps hold photons
+  // 32w .. 32w + 31, exactly as in the history-based kernel.
+  uint64_t issued = 0;
+  for (std::size_t w = 0; w < n; w += 32) {
+    uint32_t longest = 0;
+    for (std::size_t i = w; i < std::min<std::size_t>(n, w + 32); ++i) {
+      longest = std::max(longest, hist.n_boundary[i] + hist.n_scatter[i] +
+                                      (hist.fate[i] == static_cast<uint8_t>(Fate::AbsorbedBulk)));
+    }
+    issued += 32ull * longest;
+  }
+  CHECK(s.launches == 1);
+  CHECK(s.issued_lane_steps == issued);
 }
