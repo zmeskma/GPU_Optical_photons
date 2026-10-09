@@ -127,7 +127,7 @@ paths and masks off the lanes that are not on the current path.
    - The surface model is a kernel parameter, so every thread takes the same
      side of that `if`.
 
-## 4. How event-based tracking would reduce it
+## 4. How event-based tracking reduces it, and what it costs
 
 In an **event-based** (or "stepping-loop-on-the-host") design, the photon
 state lives in global memory and each kernel launch advances *all alive
@@ -179,3 +179,17 @@ design is therefore:
 
 Choosing *k* is a trade-off between lane utilisation and the cost of
 moving photon state through global memory. Only measurement settles it.
+
+**Measured** (GPU v2, [`src/gpu/gpu_event.cu`](../src/gpu/gpu_event.cu); full
+table and discussion in the README, §7). This version uses a fused kernel
+that runs up to *k* steps per launch, with warp-aggregated compaction and no
+refill.
+- The lane efficiencies above are reproduced exactly by counters in the
+  kernel.
+- The speed-up is much smaller than the efficiency gain: at best 1.10×
+  (polished, k = 8) and 1.27× (Lambertian, k = 4), and k = 1 is slower than
+  history-based.
+- Most launches in the tail have too few photons to fill the GPU, and every
+  launch costs a host round trip of about 50 µs.
+- Refill and a device-side loop are what would turn the lane efficiency into
+  speed.

@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "cuda_util.cuh"
 #include "optphot/backend.hpp"
 #include "optphot/transport.hpp"
 
@@ -38,22 +39,7 @@ namespace optphot {
 
 namespace {
 
-#define CUDA_CHECK(call)                                                                         \
-  do {                                                                                           \
-    const cudaError_t err_ = (call);                                                             \
-    if (err_ != cudaSuccess) {                                                                   \
-      throw std::runtime_error(std::string("CUDA error: ") + cudaGetErrorString(err_) + " at " + \
-                               __FILE__ + ":" + std::to_string(__LINE__) + " (" #call ")");      \
-    }                                                                                            \
-  } while (0)
-
-// Device pointers of the structure-of-arrays record buffers.
-struct DeviceRecords {
-  uint8_t* fate;
-  uint32_t* n_boundary;
-  uint32_t* n_scatter;
-  float *t, *x, *y, *z, *path;
-};
+using namespace cuda_util;
 
 // SimParams is passed by value: kernel arguments live in the constant bank,
 // which is cached and broadcast to all threads of a warp reading the same
@@ -62,15 +48,7 @@ __global__ void transport_records_kernel(SimParams p, uint64_t first_id, uint64_
                                          DeviceRecords out) {
   const uint64_t i = static_cast<uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (i >= n) return;  // the last block may be partially filled
-  const PhotonResult r = transport_photon(p, first_id + i);
-  out.fate[i] = static_cast<uint8_t>(r.fate);
-  out.n_boundary[i] = r.n_boundary;
-  out.n_scatter[i] = r.n_scatter;
-  out.t[i] = r.t;
-  out.x[i] = r.pos.x;
-  out.y[i] = r.pos.y;
-  out.z[i] = r.pos.z;
-  out.path[i] = r.path;
+  store_record(out, i, transport_photon(p, first_id + i));
 }
 
 using u64 = unsigned long long;  // the type CUDA's 64-bit atomicAdd takes
@@ -121,42 +99,6 @@ __global__ void transport_tally_kernel(SimParams p, TallyConfig c, uint64_t firs
   }
 }
 
-double ms_since(std::chrono::steady_clock::time_point t0) {
-  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-}
-
-// RAII wrapper so that device memory is released on exceptions too.
-template <class T>
-struct DeviceBuffer {
-  T* ptr = nullptr;
-  explicit DeviceBuffer(std::size_t count) { CUDA_CHECK(cudaMalloc(&ptr, count * sizeof(T))); }
-  ~DeviceBuffer() { cudaFree(ptr); }
-  DeviceBuffer(const DeviceBuffer&) = delete;
-  DeviceBuffer& operator=(const DeviceBuffer&) = delete;
-};
-
-struct EventPair {
-  cudaEvent_t start, stop;
-  EventPair() {
-    CUDA_CHECK(cudaEventCreate(&start));
-    CUDA_CHECK(cudaEventCreate(&stop));
-  }
-  ~EventPair() {
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
-  }
-  float elapsed_ms() {
-    CUDA_CHECK(cudaEventSynchronize(stop));
-    float ms = 0.f;
-    CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
-    return ms;
-  }
-};
-
-// Creates the CUDA context outside the timed region (the first CUDA call of a
-// process costs 0.1-1 s, which is not transport time).
-void ensure_context() { CUDA_CHECK(cudaFree(nullptr)); }
-
 }  // namespace
 
 bool gpu_available() {
@@ -183,10 +125,8 @@ RunTiming run_gpu_records(const SimParams& p, uint64_t n, PhotonRecords& out, in
   const uint64_t cap = std::max<uint64_t>(1, std::min(n, chunk));
 
   const auto ta = std::chrono::steady_clock::now();
-  DeviceBuffer<uint8_t> fate(cap);
-  DeviceBuffer<uint32_t> nb(cap), ns(cap);
-  DeviceBuffer<float> t(cap), x(cap), y(cap), z(cap), path(cap);
-  const DeviceRecords dev{fate.ptr, nb.ptr, ns.ptr, t.ptr, x.ptr, y.ptr, z.ptr, path.ptr};
+  const DeviceRecordBuffers buffers(cap);
+  const DeviceRecords dev = buffers.view();
   timing.alloc_ms = ms_since(ta);
 
   EventPair kernel_ev, copy_ev;
@@ -204,18 +144,7 @@ RunTiming run_gpu_records(const SimParams& p, uint64_t n, PhotonRecords& out, in
     // a pinned buffer. Pinned host memory + streams would allow faster,
     // asynchronous copies overlapping the next chunk's kernel (see README).
     CUDA_CHECK(cudaEventRecord(copy_ev.start));
-    CUDA_CHECK(
-        cudaMemcpy(out.fate.data() + done, dev.fate, m * sizeof(uint8_t), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.n_boundary.data() + done, dev.n_boundary, m * sizeof(uint32_t),
-                          cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.n_scatter.data() + done, dev.n_scatter, m * sizeof(uint32_t),
-                          cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.t.data() + done, dev.t, m * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.x.data() + done, dev.x, m * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.y.data() + done, dev.y, m * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(out.z.data() + done, dev.z, m * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(
-        cudaMemcpy(out.path.data() + done, dev.path, m * sizeof(float), cudaMemcpyDeviceToHost));
+    buffers.copy_to_host(out, done, m);
     CUDA_CHECK(cudaEventRecord(copy_ev.stop));
     timing.d2h_ms += copy_ev.elapsed_ms();
   }

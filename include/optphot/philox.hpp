@@ -114,10 +114,30 @@ class PhiloxStream {
     return r;
   }
 
+  // Resumes the stream of a photon that has already consumed `draws` words.
+  // Because the generator is counter-based, this one number is the complete
+  // state: the event-based GPU kernel stores 4 bytes per photon instead of
+  // the 28-byte object. If the last block is partly used, it is regenerated
+  // (one Philox call) and the consumed words are shifted out.
+  OPT_HD PhiloxStream(uint64_t seed, uint64_t photon_id, uint32_t draws)
+      : PhiloxStream(seed, photon_id) {
+    block_ = (draws + 3u) / 4u;
+    available_ = 4u * block_ - draws;
+    if (available_ > 0) {
+      buf_ = philox4x32_10(U32x4{block_ - 1u, 0u, id_lo_, id_hi_}, key_);
+      for (uint32_t used = 4u - available_; used > 0; --used) {
+        buf_.x = buf_.y;
+        buf_.y = buf_.z;
+        buf_.z = buf_.w;
+      }
+    }
+  }
+
   // Uniform float in (0, 1].
   OPT_HD OPT_INLINE float uniform() { return u32_to_uniform(next_u32()); }
 
-  // Number of 32-bit words consumed so far (for diagnostics / tests).
+  // Number of 32-bit words consumed so far; with the constructor above, this
+  // is all that is needed to suspend and resume the stream.
   OPT_HD uint32_t draws() const { return 4u * block_ - available_; }
 
  private:

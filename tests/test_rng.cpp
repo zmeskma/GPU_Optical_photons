@@ -57,6 +57,19 @@ TEST_CASE("PhiloxStream is a pure function of (seed, photon id)", "[rng]") {
   }
 }
 
+TEST_CASE("PhiloxStream resumes exactly from its draw count", "[rng]") {
+  // Suspending after any number of draws (including mid-block) and resuming
+  // from draws() must continue the same sequence: this is all the RNG state
+  // the event-based GPU kernel keeps between launches.
+  for (uint32_t skip = 0; skip < 13; ++skip) {
+    PhiloxStream full(7u, 123456789012ull);
+    for (uint32_t i = 0; i < skip; ++i) (void)full.next_u32();
+    PhiloxStream resumed(7u, 123456789012ull, full.draws());
+    CHECK(resumed.draws() == skip);
+    for (int i = 0; i < 9; ++i) REQUIRE(resumed.next_u32() == full.next_u32());
+  }
+}
+
 TEST_CASE("Different photons and seeds give different streams", "[rng]") {
   PhiloxStream a(1u, 0u), b(1u, 1u), c(2u, 0u);
   int same_ab = 0, same_ac = 0;
