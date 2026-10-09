@@ -28,7 +28,10 @@ if(WITH_CUDA)
   target_sources(optphot_gpu PRIVATE gpu/gpu_event.cu)
   # Static CUDA runtime: executables do not need cudart64_12.dll / libcudart.so
   # at run time (otherwise a missing DLL makes ctest silently drop the GPU tests).
-  target_link_libraries(optphot_gpu PUBLIC optphot_physics CUDA::cudart_static)
+  # optphot_core provides PhotonRecords::resize / Tally::reset. Without this
+  # dependency GNU ld, which scans static libraries once, fails for apps that
+  # do not themselves pull in the CPU backend (MSVC resolves in any order).
+  target_link_libraries(optphot_gpu PUBLIC optphot_physics optphot_core CUDA::cudart_static)
   target_compile_definitions(optphot_gpu PUBLIC OPTPHOT_HAVE_CUDA)
   # -lineinfo: maps SASS back to source lines in Nsight Compute; no runtime cost.
   target_compile_options(optphot_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
